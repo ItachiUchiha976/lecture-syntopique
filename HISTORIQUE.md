@@ -147,6 +147,27 @@ l'utilisation et `Guide d'installation.pdf` pour la mise en ligne et l'installat
   Agenda → l'app sait seulement si l'utilisateur a cliqué « Activer ».
 - **Citation de sortie.** `showExitQuote()` : pop-up **plein écran** (citation Steve Jobs) déclenché sur
   `visibilitychange → hidden` (≈ quand on quitte l'app sur iPad), une fois par session.
+- **Correctif mise à jour / cache (`sw.js`).** L'ancienne stratégie « cache-first partout » pouvait **bloquer
+  l'app sur une vieille version** (le code en cache re-enregistrait toujours l'ancien `sw.js?v=…`). Nouvelle stratégie :
+  **network-first** pour les navigations + le code de l'app (`.js`/`.css`, dont `version.js`/`main.js`), **cache-first**
+  pour `vendor/`/icônes/polices/WASM. Les mises à jour s'appliquent dès qu'on est en ligne, l'offline reste assuré.
+  Comme le **contenu de `sw.js` change**, même un client bloqué récupère le correctif (le navigateur revérifie
+  toujours le script du SW). `version.js` → **2026.06.02.4**.
+- **Renfort iPad (`main.js`) + guide.** Ajout d'un `reg.update()` sur `visibilitychange → visible` : l'app vérifie
+  une nouvelle version **à chaque retour au premier plan** (l'iPad adopte la mise à jour sans manip manuelle).
+  Guide PDF + README enrichis : section **« L'app affiche une ancienne version ? »** (PC `Ctrl+Shift+R` / iPad
+  fermer-rouvrir en ligne / dernier recours réinstaller après Sauvegarde) + réassurance **« données enregistrées
+  automatiquement »** (censures via `reader-pane.js` `onCommit → store.patchPage`, instantané ; les MAJ ne touchent
+  jamais IndexedDB/OPFS). `version.js` → **2026.06.02.5**.
+- **Aide-mémoire d'utilisation (`showUsageGuide`).** 2ᵉ carte affichée à chaque ouverture, juste après les 2 messages
+  (enchaînée depuis le `close` de `showWelcomeTips`) : gestes clés (censurer / ouvrir 2 PDF / censurer toute une page /
+  rétablir). `version.js` → **2026.06.02.6**.
+- **Clarification produit (réversibilité).** Les censures sont enregistrées en continu mais **toujours réversibles** ;
+  rien n'est définitif tant qu'on ne fait pas un **export « graver »** (qui ne produit qu'une copie filtrée — l'original
+  reste intact dans l'app). Le temps de lecture **déverrouille l'export**, il ne fige pas les censures.
+- **Pause posture (`showPostureReminder`).** Rappel de recadrage du dos contre un mur (« ange mural » / wall angel) :
+  déclenché **toutes les heures de présence active** (compteur de temps au 1er plan dans `main.js`, tick 60 s) **et à
+  la sortie**, enchaîné juste après la citation (depuis le `close` de `showExitQuote`). `version.js` → **2026.06.02.7**.
 - **Doc & version.** README + ce guide mis à jour ; correction « doigt ou Pencil » → **Apple Pencil uniquement** ;
   `version.js` → **2026.06.02.3**. App **publiée en ligne** sur GitHub Pages (cf. [[deploiement-en-ligne]] côté mémoire).
   Syntaxe ES vérifiée (`node --check`) + service HTTP local OK. Reste à valider sur iPad réel : micro `.m4a`,

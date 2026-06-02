@@ -207,6 +207,20 @@ body {
 .welcome-hide { display: flex; align-items: center; gap: 6px; color: var(--text-dim); font-size: .82rem; cursor: pointer; }
 .welcome-hide input { width: 18px; height: 18px; }
 
+/* ===== Aide-mémoire d'utilisation (2e carte d'accueil) ===== */
+.usage-card { width: min(480px, 100%); }
+.usage-item { display: flex; gap: 12px; align-items: flex-start; margin: 12px 0; }
+.usage-item__icon { font-size: 1.3rem; flex: 0 0 auto; line-height: 1.4; }
+.usage-item__title { font-weight: 700; color: var(--text); }
+.usage-item__desc { color: var(--text-dim); font-size: .88rem; line-height: 1.4; margin-top: 2px; }
+
+/* ===== Pause posture (recadrage du dos) ===== */
+.posture-card { width: min(480px, 100%); }
+.posture-intro { color: var(--text); }
+.posture-steps { margin: 10px 0; padding-left: 22px; }
+.posture-steps li { margin: 6px 0; line-height: 1.45; }
+.posture-note { color: var(--text-dim); font-size: .85rem; line-height: 1.4; margin-top: 10px; }
+
 /* ===== Citation de sortie (plein écran) ===== */
 .exit-overlay { background: linear-gradient(160deg, #0b1220, #1e293b); backdrop-filter: blur(6px); }
 .exit-card { max-width: 620px; text-align: center; padding: 28px 24px; }

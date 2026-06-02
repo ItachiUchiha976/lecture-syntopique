@@ -45,7 +45,11 @@ export async function showWelcomeTips() {
   else showReminder = (now - doneAt) >= REPROMPT_MS;                 // activé : re-proposer avant la fin
 
   const overlay = el('div', { class: 'overlay welcome-overlay' });
-  const close = () => { overlay.style.transition = 'opacity .15s ease'; overlay.style.opacity = '0'; setTimeout(() => overlay.remove(), 150); };
+  // À la fermeture de cette carte, on enchaîne sur l'aide-mémoire d'utilisation.
+  const close = () => {
+    overlay.style.transition = 'opacity .15s ease'; overlay.style.opacity = '0';
+    setTimeout(() => { overlay.remove(); showUsageGuide(); }, 150);
+  };
 
   const tip1 = el('div', { class: 'welcome-tip' }, [
     el('span', { class: 'welcome-tip__icon', text: '🧠' }),
@@ -92,6 +96,63 @@ export async function showWelcomeTips() {
   document.body.appendChild(overlay);
 }
 
+// ----- Aide-mémoire d'utilisation (2e carte, après les 2 messages) -----
+// Affiché à chaque ouverture, juste après la carte d'accueil : rappel express des
+// gestes clés (censurer, ouvrir 2 PDF, censurer toute une page, rétablir).
+function showUsageGuide() {
+  if (document.querySelector('.usage-overlay')) return;
+  const overlay = el('div', { class: 'overlay usage-overlay' });
+  const close = () => { overlay.style.transition = 'opacity .15s ease'; overlay.style.opacity = '0'; setTimeout(() => overlay.remove(), 150); };
+  const item = (icon, title, desc) => el('div', { class: 'usage-item' }, [
+    el('span', { class: 'usage-item__icon', text: icon }),
+    el('div', {}, [
+      el('div', { class: 'usage-item__title', html: title }),
+      el('div', { class: 'usage-item__desc', html: desc }),
+    ]),
+  ]);
+  const card = el('div', { class: 'dialog usage-card', role: 'dialog', 'aria-modal': 'true' }, [
+    el('h3', { text: '📖 Aide-mémoire' }),
+    item('🖊️', 'Censurer', 'Choisis un outil (▭ rectangle, ◌ forme libre, 🖊 surligneur), puis dessine à l’<strong>Apple Pencil</strong> — le doigt sert à faire défiler.'),
+    item('▦', 'Ouvrir 2 PDF côte à côte', 'Dans la bibliothèque, bouton <strong>Comparer</strong> sur un livre → choisis le second. Le bouton <strong>⇄</strong> remplace un des deux.'),
+    item('✔️', 'Censurer toute une page', 'Bouton <strong>Vérifier la censure</strong> : si plus de <strong>80 %</strong> est masqué, l’app propose de censurer toute la page (100 % = automatique).'),
+    item('♻️', 'Rétablir une censure', '<strong>↶</strong> annule le dernier tracé. Pour une page entièrement censurée : bouton <strong>Rétablir</strong> (ou <strong>Vérifier</strong> → Rétablir). Réversible à tout moment.'),
+    el('div', { class: 'welcome-foot' }, [
+      el('span', { class: 'spacer' }),
+      el('button', { class: 'btn btn--primary', text: 'Compris', onClick: () => close() }),
+    ]),
+  ]);
+  overlay.appendChild(card);
+  overlay.addEventListener('pointerdown', (e) => { if (e.target === overlay) close(); });
+  document.body.appendChild(overlay);
+}
+
+// ----- Pause posture : recadrage du dos contre le mur (« ange mural » / wall angel) -----
+// Déclenché toutes les heures de présence active (cf. main.js) et à la sortie de l'app,
+// juste après la citation. Réversible/ignorable d'un tap.
+export function showPostureReminder() {
+  if (document.querySelector('.posture-overlay')) return;
+  const overlay = el('div', { class: 'overlay posture-overlay' });
+  const close = () => { overlay.style.transition = 'opacity .15s ease'; overlay.style.opacity = '0'; setTimeout(() => overlay.remove(), 150); };
+  const card = el('div', { class: 'dialog posture-card', role: 'dialog', 'aria-modal': 'true' }, [
+    el('h3', { text: '🧍 Pause posture — recadre ton dos' }),
+    el('p', { class: 'posture-intro', text: 'Tu lis depuis un moment : 30 secondes pour réaligner ton dos contre un mur.' }),
+    el('ol', { class: 'posture-steps' }, [
+      el('li', { html: 'Tiens-toi <strong>debout, dos contre un mur</strong>.' }),
+      el('li', { html: 'Colle au mur : l’<strong>arrière de la tête</strong>, le <strong>haut du dos (omoplates)</strong> et les <strong>fesses</strong> (talons légèrement décollés si besoin).' }),
+      el('li', { html: '<strong>Rentre doucement le menton</strong> (léger double menton) pour aligner la nuque.' }),
+      el('li', { html: 'Garde la courbe naturelle du bas du dos, respire, et <strong>tiens 20–30 s</strong>.' }),
+    ]),
+    el('p', { class: 'posture-note', html: '<em>Variante « ange mural » : bras contre le mur, coudes pliés, fais-les glisser de haut en bas (comme un ange dans la neige) — ça ouvre les épaules.</em>' }),
+    el('div', { class: 'welcome-foot' }, [
+      el('span', { class: 'spacer' }),
+      el('button', { class: 'btn btn--primary', text: 'C’est fait 👍', onClick: () => close() }),
+    ]),
+  ]);
+  overlay.appendChild(card);
+  overlay.addEventListener('pointerdown', (e) => { if (e.target === overlay) close(); });
+  document.body.appendChild(overlay);
+}
+
 // ----- Citation de sortie (pop-up plein écran) -----
 // iOS ne fournit pas d'évènement fiable « app fermée » ; on déclenche donc cette citation
 // quand l'app passe en arrière-plan (visibilitychange → hidden). Affichée une fois par session.
@@ -101,7 +162,8 @@ export function showExitQuote() {
   if (document.querySelector('.exit-overlay')) return;
   _exitShown = true;
   const overlay = el('div', { class: 'overlay exit-overlay' });
-  const close = () => overlay.remove();
+  // Après la citation : on enchaîne sur la pause posture (recadrage du dos).
+  const close = () => { overlay.remove(); showPostureReminder(); };
   const card = el('div', { class: 'exit-card' }, [
     el('p', { class: 'exit-quote', text: QUOTE }),
     el('p', { class: 'exit-author', text: QUOTE_AUTHOR }),

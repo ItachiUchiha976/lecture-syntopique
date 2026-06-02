@@ -72,8 +72,16 @@ Deux options gratuites, de la plus simple à la plus classique :
 
 ## 4) Bon à savoir
 
+- **Enregistrement automatique** : tes **censures, ta progression et tes notes vocales** sont sauvegardées sur
+  l'appareil **au fur et à mesure** (instantanément, dans la base locale). Fermer l'app ou la **mettre à jour
+  n'efface rien**. Le bouton **Sauvegarder** sert juste à créer une **copie de secours partageable** (filet de sécurité).
 - **Sauvegarde régulière** : effacer les données de Safari peut vider l'app. Utilise **Sauvegarder** de temps en temps.
 - L'app demande au système de **conserver** ses données (anti-effacement) ; ouvre-la au moins de temps en temps.
+- **L'app affiche une ancienne version ?** Normalement les mises à jour s'appliquent seules quand tu ouvres l'app
+  en ligne. Si une vieille version persiste : sur **PC (Chrome)** fais `Ctrl + Shift + R` (1-2 fois) ; sur **iPad**
+  ferme complètement l'app et rouvre-la **connecté à Internet** (recommence si besoin). En dernier recours sur iPad :
+  fais une **Sauvegarde**, retire l'icône de l'écran d'accueil et réinstalle depuis Safari (ne touche **pas** à
+  « Effacer historique et données » de Safari, qui viderait l'app).
 - Tout est **gratuit et hors-ligne** : aucune donnée n'est envoyée sur Internet.
 
 ---
@@ -83,6 +91,8 @@ Deux options gratuites, de la plus simple à la plus classique :
 - À **chaque ouverture**, l'app affiche une petite carte avec **deux rappels permanents** : (1) penser à
   **mémoriser les connexions** dans un *palais de mémoire* ; (2) enregistrer tes **connexions vocales**
   (bouton 🎤) puis les partager à une IA. *(Ces deux messages s'affichent toujours.)*
+- Juste après s'affiche un **aide-mémoire** (lui aussi à chaque ouverture) : rappel express des gestes clés —
+  **censurer**, **ouvrir 2 PDF côte à côte**, **censurer toute une page**, **rétablir une censure**.
 - **Rappel quotidien 07h00 (3 mois)** : sur cette carte, le bouton **« ⏰ Activer le rappel quotidien »** ouvre
   **Google Agenda** avec un évènement récurrent prêt à enregistrer (un seul tap → « Enregistrer ») ; heure
   pré-réglée sur 07h00 (fuseau Europe/Paris, modifiable avant d'enregistrer).
@@ -93,6 +103,9 @@ Deux options gratuites, de la plus simple à la plus classique :
     (ajout au calendrier) ou importé dans Google Agenda (Réglages → Importer).
 - **Citation de sortie** : quand tu **quittes / mets l'app en arrière-plan**, un pop-up **plein écran** affiche
   une citation de motivation (Steve Jobs). Tu la vois en partant et elle t'attend à ton retour ; touche pour fermer.
+- **Pause posture** : un rappel de **recadrage du dos** (debout, arrière de la tête + haut du dos + fesses contre
+  un mur — « ange mural ») s'affiche **toutes les heures** passées dans l'app, et **juste après la citation** quand
+  tu quittes. Objectif : contrer le dos voûté de la lecture prolongée.
 
 ## 6) Détails techniques (pour info)
 

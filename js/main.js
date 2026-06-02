@@ -3,7 +3,7 @@ import { APP_VERSION } from '../version.js';
 import { register, startRouter, navigate } from './router.js';
 import { requestPersistence } from './storage.js';
 import { toast } from './ui/dialogs.js';
-import { showWelcomeTips, showExitQuote } from './ui/welcome-tips.js';
+import { showWelcomeTips, showExitQuote, showPostureReminder } from './ui/welcome-tips.js';
 
 // ----- Service worker (offline + install) -----
 function registerSW() {
@@ -24,6 +24,11 @@ function registerSW() {
           sw.postMessage('SKIP_WAITING'); // active immédiatement la nouvelle version
         }
       });
+    });
+    // iPad/Safari : vérifie proactivement une nouvelle version quand l'app revient au
+    // premier plan (adopte la mise à jour sans rechargement manuel).
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') reg.update().catch(() => {});
     });
   }).catch((e) => console.warn('[sw] enregistrement échoué', e));
 }
@@ -49,6 +54,15 @@ async function boot() {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') showExitQuote();
   });
+
+  // Pause posture : toutes les heures de présence ACTIVE (au-delà d'1h passée dans l'app ouverte).
+  let activeMin = 0, lastHourShown = 0;
+  setInterval(() => {
+    if (document.visibilityState !== 'visible') return; // on ne compte que le temps app ouverte au 1er plan
+    activeMin += 1;
+    const hours = Math.floor(activeMin / 60);
+    if (hours >= 1 && hours > lastHourShown) { lastHourShown = hours; showPostureReminder(); }
+  }, 60000);
 }
 
 boot().catch((e) => {
