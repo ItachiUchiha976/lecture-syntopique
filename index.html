@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <!-- viewport-fit=cover : utilise toute la dalle (encoches/coins) ; le zoom est géré par l'app dans le lecteur -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#1f2937">
+  <title>Lecture Syntopique</title>
+
+  <link rel="manifest" href="manifest.webmanifest">
+
+  <!-- iOS : mode app plein écran (standalone) -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Syntopique">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
+
+  <!-- iOS : écrans de démarrage (iPad 10ᵉ gén. — 820×1180 pt @2x) -->
+  <link rel="apple-touch-startup-image"
+        media="screen and (device-width: 820px) and (device-height: 1180px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"
+        href="icons/splash/ipad10-portrait.png">
+  <link rel="apple-touch-startup-image"
+        media="screen and (device-width: 820px) and (device-height: 1180px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)"
+        href="icons/splash/ipad10-landscape.png">
+
+  <link rel="stylesheet" href="css/reset.css">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/reader.css">
+  <link rel="stylesheet" href="css/toolbar.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Écran de chargement initial (remplacé par le routeur) -->
+    <div class="empty-state" style="margin:auto">
+      <div class="spinner" aria-label="Chargement"></div>
+    </div>
+  </div>
+
+  <div id="toast-root" class="toast-wrap" aria-live="polite"></div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

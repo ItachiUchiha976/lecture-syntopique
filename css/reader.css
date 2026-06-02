@@ -1,0 +1,67 @@
+/* ===== Lecteur PDF (rempli en Phase 2 ; styles de base ici) ===== */
+.reader { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+/* Conteneur scrollable des pages */
+.pages-scroller {
+  flex: 1; min-height: 0; overflow: auto; -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  background: #0b1220;
+  padding: 16px 0 calc(16px + var(--safe-bottom));
+  scroll-behavior: auto;
+}
+
+/* Enveloppe d'une page (réserve la place même avant rendu : évite les sauts de scroll) */
+.page-wrap {
+  position: relative; margin: 0 auto 16px; background: #fff;
+  box-shadow: 0 2px 12px rgba(0,0,0,.4);
+  /* width/height fixés en JS d'après la taille de page rendue */
+}
+.page-wrap canvas.page-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.page-wrap .page-placeholder { position: absolute; inset: 0; display: grid; place-items: center; color: #94a3b8; }
+.page-wrap .page-number { position: absolute; top: 6px; left: 8px; font-size: .7rem; color: #64748b;
+  background: rgba(255,255,255,.7); padding: 1px 6px; border-radius: 6px; }
+
+/* Couches superposées (texte sélectionnable + annotations) — Phases 3 & 4 */
+.text-layer { position: absolute; inset: 0; overflow: hidden; opacity: 1; line-height: 1;
+  -webkit-user-select: text; user-select: text; }
+.text-layer span { position: absolute; color: transparent; white-space: pre; transform-origin: 0 0; cursor: text; }
+.text-layer .hl { background: rgba(245,166,35,.45); border-radius: 2px; }
+.text-layer .hl--current { background: rgba(245,166,35,.85); }
+
+.censor-layer { position: absolute; inset: 0; pointer-events: none; }
+
+/* Overlay "page entièrement censurée" (réversible via le bouton Rétablir) */
+.censored-overlay { position: absolute; inset: 0; z-index: 5; background: rgba(11,18,32,.97);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
+.censored-overlay .label { color: #cbd5e1; font-weight: 600; letter-spacing: .3px; }
+/* En mode outil actif : le calque de censure capte le STYLET (Apple Pencil) pour
+   dessiner les masques, tandis que la couche texte ne capte plus rien.
+   touch-action: pan-x pan-y => le DOIGT continue de faire défiler la page (utile aussi
+   quand elle est zoomée), tandis que le stylet est capturé et dessine
+   (censor.js ignore pointerType 'touch').
+   En mode "none" (lecture) : sélection de texte possible, scroll normal. */
+.pages-scroller[data-tool="rect"]   .censor-layer,
+.pages-scroller[data-tool="lasso"]  .censor-layer,
+.pages-scroller[data-tool="highlight"] .censor-layer,
+.pages-scroller[data-tool="erase"]  .censor-layer { pointer-events: auto; touch-action: pan-x pan-y; }
+.pages-scroller[data-tool="rect"]   .text-layer,
+.pages-scroller[data-tool="lasso"]  .text-layer,
+.pages-scroller[data-tool="highlight"] .text-layer,
+.pages-scroller[data-tool="erase"]  .text-layer { pointer-events: none; }
+
+/* Mode double côte à côte — Phase 9 */
+.dual { display: flex; flex: 1; min-height: 0; }
+.dual-col { flex: 1 1 50%; min-width: 0; display: flex; flex-direction: column; border-right: 1px solid var(--line); }
+.dual-col:last-child { border-right: none; }
+.dual-col__head { flex: 0 0 auto; padding: 4px 8px; font-size: .8rem; color: var(--text-dim);
+  background: var(--bg-elev); border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 6px; }
+.dual-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dual-swap { width: 34px; height: 34px; min-height: 34px; flex: 0 0 auto; font-size: 1rem; }
+.dual-col__head .spacer { flex: 1; }
+.dual-col .reader { flex: 1; min-height: 0; }
+.reader--focus { box-shadow: inset 0 0 0 2px var(--accent); }
+@media (orientation: portrait) {
+  .dual { flex-direction: column; }
+  .dual-col { border-right: none; border-bottom: 1px solid var(--line); }
+}

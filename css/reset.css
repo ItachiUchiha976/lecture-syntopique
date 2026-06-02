@@ -1,0 +1,17 @@
+/* Reset minimal et confortable pour le tactile / Pencil */
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; }
+html, body { height: 100%; }
+body {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+img, svg, canvas { display: block; max-width: 100%; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; background: none; border: none; }
+ul, ol { list-style: none; padding: 0; }
+:focus-visible { outline: 2px solid var(--accent, #f5a623); outline-offset: 2px; }
+/* Empêche la sélection involontaire pendant le dessin (réactivée sur la couche texte) */
+.no-select { -webkit-user-select: none; user-select: none; }

@@ -1,0 +1,22 @@
+/* ===== Barre d'outils de censure (remplie en Phase 4) ===== */
+.toolbar {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 8px max(10px, var(--safe-left)) 8px max(10px, var(--safe-right));
+  background: var(--bg-elev); border-bottom: 1px solid var(--line);
+  flex: 0 0 auto;
+}
+.toolbar .tool { width: 44px; height: 44px; border-radius: 10px; display: grid; place-items: center;
+  border: 1px solid transparent; color: var(--text-dim); font-size: 1.1rem; }
+.toolbar .tool[aria-pressed="true"] { background: var(--bg-elev-2); color: var(--accent); border-color: var(--accent); }
+.toolbar .sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 4px; }
+.toolbar .spacer { flex: 1; }
+
+/* Indicateur de progression de lecture (Phase 6) */
+.read-progress { display: flex; align-items: center; gap: 8px; font-size: .8rem; color: var(--text-dim); }
+.read-progress .bar { width: 120px; }
+
+/* Zoom (− / 100% / +) */
+.toolbar .zoom-group { display: flex; align-items: center; gap: 2px; }
+.toolbar .zoom-group .tool { font-size: 1.3rem; font-weight: 700; }
+.toolbar .zoom-label { min-width: 58px; height: 44px; padding: 0 6px; border-radius: 10px;
+  color: var(--text-dim); font-size: .8rem; font-variant-numeric: tabular-nums; text-align: center; }
