@@ -168,6 +168,9 @@ l'utilisation et `Guide d'installation.pdf` pour la mise en ligne et l'installat
 - **Pause posture (`showPostureReminder`).** Rappel de recadrage du dos contre un mur (« ange mural » / wall angel) :
   déclenché **toutes les heures de présence active** (compteur de temps au 1er plan dans `main.js`, tick 60 s) **et à
   la sortie**, enchaîné juste après la citation (depuis le `close` de `showExitQuote`). `version.js` → **2026.06.02.7**.
+- **Aide-mémoire précisé.** L'item « Rétablir une censure » indique désormais que c'est possible **même après
+  fermeture/réouverture du PDF** (les `censorMarks` + l'état `censored` sont rechargés depuis IndexedDB par
+  `reader-pane.js`). `version.js` → **2026.06.02.8**.
 - **Doc & version.** README + ce guide mis à jour ; correction « doigt ou Pencil » → **Apple Pencil uniquement** ;
   `version.js` → **2026.06.02.3**. App **publiée en ligne** sur GitHub Pages (cf. [[deploiement-en-ligne]] côté mémoire).
   Syntaxe ES vérifiée (`node --check`) + service HTTP local OK. Reste à valider sur iPad réel : micro `.m4a`,

@@ -115,7 +115,7 @@ function showUsageGuide() {
     item('🖊️', 'Censurer', 'Choisis un outil (▭ rectangle, ◌ forme libre, 🖊 surligneur), puis dessine à l’<strong>Apple Pencil</strong> — le doigt sert à faire défiler.'),
     item('▦', 'Ouvrir 2 PDF côte à côte', 'Dans la bibliothèque, bouton <strong>Comparer</strong> sur un livre → choisis le second. Le bouton <strong>⇄</strong> remplace un des deux.'),
     item('✔️', 'Censurer toute une page', 'Bouton <strong>Vérifier la censure</strong> : si plus de <strong>80 %</strong> est masqué, l’app propose de censurer toute la page (100 % = automatique).'),
-    item('♻️', 'Rétablir une censure', '<strong>↶</strong> annule le dernier tracé. Pour une page entièrement censurée : bouton <strong>Rétablir</strong> (ou <strong>Vérifier</strong> → Rétablir). Réversible à tout moment.'),
+    item('♻️', 'Rétablir une censure', '<strong>↶</strong> annule le dernier tracé. Pour une page entièrement censurée : bouton <strong>Rétablir</strong> (ou <strong>Vérifier</strong> → Rétablir). Possible <strong>même après avoir fermé puis rouvert le PDF</strong> — tout est enregistré sur l’appareil.'),
     el('div', { class: 'welcome-foot' }, [
       el('span', { class: 'spacer' }),
       el('button', { class: 'btn btn--primary', text: 'Compris', onClick: () => close() }),

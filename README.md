@@ -92,7 +92,8 @@ Deux options gratuites, de la plus simple à la plus classique :
   **mémoriser les connexions** dans un *palais de mémoire* ; (2) enregistrer tes **connexions vocales**
   (bouton 🎤) puis les partager à une IA. *(Ces deux messages s'affichent toujours.)*
 - Juste après s'affiche un **aide-mémoire** (lui aussi à chaque ouverture) : rappel express des gestes clés —
-  **censurer**, **ouvrir 2 PDF côte à côte**, **censurer toute une page**, **rétablir une censure**.
+  **censurer**, **ouvrir 2 PDF côte à côte**, **censurer toute une page**, **rétablir une censure**
+  (possible **même après avoir fermé puis rouvert** le PDF — tout est enregistré sur l'appareil).
 - **Rappel quotidien 07h00 (3 mois)** : sur cette carte, le bouton **« ⏰ Activer le rappel quotidien »** ouvre
   **Google Agenda** avec un évènement récurrent prêt à enregistrer (un seul tap → « Enregistrer ») ; heure
   pré-réglée sur 07h00 (fuseau Europe/Paris, modifiable avant d'enregistrer).
