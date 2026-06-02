@@ -21,6 +21,7 @@ export function createCensorLayer({ wrap, cssW, cssH, nativeW, nativeH, getTextD
   canvas.height = Math.max(1, Math.round(cssH * dpr));
   wrap.appendChild(canvas);
   const ctx = canvas.getContext('2d');
+  const scroller = wrap.closest('.pages-scroller'); // pour le défilement au doigt (touch-action:none)
 
   const dispScale = cssW / nativeW;             // CSS px par unité PDF
   const toCss = (u) => u * dispScale;
@@ -34,6 +35,10 @@ export function createCensorLayer({ wrap, cssW, cssH, nativeW, nativeH, getTextD
   let points = [];                              // points CSS du tracé en cours
   let touched = new Set();                      // indices de spans touchés (surligneur)
   let previewRect = null;                       // rect CSS en cours
+  // Défilement au doigt : la couche active est en touch-action:none (pour que le STYLET
+  // dessine au lieu de scroller) ; on gère donc le défilement du doigt nous-mêmes.
+  let panning = false;
+  let panStartY = 0, panStartX = 0, panTop = 0, panLeft = 0;
 
   function divRectCss(idx) {
     const d = getTextDivs()[idx];
@@ -112,11 +117,19 @@ export function createCensorLayer({ wrap, cssW, cssH, nativeW, nativeH, getTextD
   function onDown(e) {
     const tool = getTool();
     if (!tool || tool === 'none' || tool === 'pan') return;
-    // Censure réservée au stylet (Apple Pencil). Le doigt (pointerType 'touch') est
-    // ignoré ici : on le laisse passer SANS preventDefault ni capture pour que le
-    // défilement natif de la page fonctionne (la couche a touch-action: pan-y).
-    // La souris reste autorisée pour les tests sur ordinateur (pas de stylet sur PC).
-    if (e.pointerType === 'touch') return;
+    // La censure est réservée au STYLET (Apple Pencil) et à la souris (tests PC).
+    // Le DOIGT (pointerType 'touch') ne dessine jamais : il sert à faire défiler.
+    // Comme la couche est en touch-action:none (indispensable pour que le stylet dessine
+    // au lieu de scroller sur iPad), on gère le défilement au doigt manuellement ici.
+    if (e.pointerType === 'touch') {
+      if (drawing) return;                       // palm rejection : un tracé stylet est en cours
+      if (!scroller) return;
+      panning = true;
+      panStartY = e.clientY; panStartX = e.clientX;
+      panTop = scroller.scrollTop; panLeft = scroller.scrollLeft;
+      try { canvas.setPointerCapture(e.pointerId); } catch {}
+      return;
+    }
     e.preventDefault();
     try { canvas.setPointerCapture(e.pointerId); } catch {}
     const p = localPt(e);
@@ -127,6 +140,13 @@ export function createCensorLayer({ wrap, cssW, cssH, nativeW, nativeH, getTextD
     redraw();
   }
   function onMove(e) {
+    if (panning) {
+      if (scroller) {
+        scroller.scrollTop = panTop - (e.clientY - panStartY);
+        scroller.scrollLeft = panLeft - (e.clientX - panStartX);
+      }
+      return;
+    }
     if (!drawing) return;
     e.preventDefault();
     const tool = getTool();
@@ -137,6 +157,7 @@ export function createCensorLayer({ wrap, cssW, cssH, nativeW, nativeH, getTextD
     redraw();
   }
   function onUp(e) {
+    if (panning) { panning = false; try { canvas.releasePointerCapture(e.pointerId); } catch {} return; }
     if (!drawing) return;
     drawing = false;
     if (onDrawingChange) onDrawingChange(false);
@@ -156,7 +177,7 @@ export function createCensorLayer({ wrap, cssW, cssH, nativeW, nativeH, getTextD
     previewRect = null; points = []; touched = new Set();
     commit();
   }
-  function onCancel() { drawing = false; if (onDrawingChange) onDrawingChange(false); previewRect = null; points = []; touched = new Set(); redraw(); }
+  function onCancel() { panning = false; drawing = false; if (onDrawingChange) onDrawingChange(false); previewRect = null; points = []; touched = new Set(); redraw(); }
 
   canvas.addEventListener('pointerdown', onDown);
   canvas.addEventListener('pointermove', onMove);

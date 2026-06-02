@@ -151,10 +151,15 @@ export async function deleteBook(id) {
   for await (const cursor of idx.iterate(IDBKeyRange.only(id))) cursor.delete();
   await tx.done;
   // Notes vocales (métadonnées) de ce livre ; leurs audios partent avec le préfixe bookId/ ci-dessous.
-  const notesTx = db.transaction(STORES.voiceNotes, 'readwrite');
-  const notesIdx = notesTx.store.index('byBook');
-  for await (const cursor of notesIdx.iterate(IDBKeyRange.only(id))) cursor.delete();
-  await notesTx.done;
+  // Sécurisé : si le store n'existe pas (ancienne base) ou en cas d'erreur, on n'empêche pas la suppression.
+  try {
+    if (db.objectStoreNames.contains(STORES.voiceNotes)) {
+      const notesTx = db.transaction(STORES.voiceNotes, 'readwrite');
+      const notesIdx = notesTx.store.index('byBook');
+      for await (const cursor of notesIdx.iterate(IDBKeyRange.only(id))) cursor.delete();
+      await notesTx.done;
+    }
+  } catch (e) { console.warn('[storage] purge notes vocales ignorée', e); }
   // Progression + binaires
   await db.delete(STORES.readingProgress, id);
   if (book) {

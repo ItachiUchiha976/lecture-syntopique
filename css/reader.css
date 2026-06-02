@@ -34,16 +34,16 @@
 .censored-overlay { position: absolute; inset: 0; z-index: 5; background: rgba(11,18,32,.97);
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
 .censored-overlay .label { color: #cbd5e1; font-weight: 600; letter-spacing: .3px; }
-/* En mode outil actif : le calque de censure capte le STYLET (Apple Pencil) pour
-   dessiner les masques, tandis que la couche texte ne capte plus rien.
-   touch-action: pan-x pan-y => le DOIGT continue de faire défiler la page (utile aussi
-   quand elle est zoomée), tandis que le stylet est capturé et dessine
-   (censor.js ignore pointerType 'touch').
-   En mode "none" (lecture) : sélection de texte possible, scroll normal. */
+/* En mode outil actif : le calque de censure capte les pointeurs pour dessiner les masques,
+   et la couche texte ne capte plus rien.
+   touch-action: none est INDISPENSABLE pour que l'Apple Pencil DESSINE (sinon iPad/Safari
+   interprète le tracé du stylet comme un défilement et ne dessine pas). Conséquence : le
+   défilement au DOIGT est géré manuellement dans censor.js (le doigt ne dessine jamais).
+   En mode "none" (lecture) : sélection de texte possible, scroll natif normal. */
 .pages-scroller[data-tool="rect"]   .censor-layer,
 .pages-scroller[data-tool="lasso"]  .censor-layer,
 .pages-scroller[data-tool="highlight"] .censor-layer,
-.pages-scroller[data-tool="erase"]  .censor-layer { pointer-events: auto; touch-action: pan-x pan-y; }
+.pages-scroller[data-tool="erase"]  .censor-layer { pointer-events: auto; touch-action: none; }
 .pages-scroller[data-tool="rect"]   .text-layer,
 .pages-scroller[data-tool="lasso"]  .text-layer,
 .pages-scroller[data-tool="highlight"] .text-layer,

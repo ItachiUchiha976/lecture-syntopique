@@ -171,6 +171,14 @@ l'utilisation et `Guide d'installation.pdf` pour la mise en ligne et l'installat
 - **Aide-mémoire précisé.** L'item « Rétablir une censure » indique désormais que c'est possible **même après
   fermeture/réouverture du PDF** (les `censorMarks` + l'état `censored` sont rechargés depuis IndexedDB par
   `reader-pane.js`). `version.js` → **2026.06.02.8**.
+- **Correctif censure au stylet sur iPad (CRITIQUE).** La couche de censure active était en `touch-action: pan-x pan-y`
+  → sur un vrai iPad, Safari interprétait le tracé de l'Apple Pencil comme un **défilement** (le stylet « réagissait
+  comme un doigt », aucune censure ne s'affichait). Passée en **`touch-action: none`** (`reader.css`) → le stylet
+  dessine. Conséquence : le **défilement au doigt** est désormais géré manuellement dans `censor.js` (pointeur
+  `touch` → drag-scroll du `.pages-scroller`, jamais de dessin ; palm rejection conservée pendant un tracé stylet).
+- **Correctif suppression de livre.** La purge des notes vocales ajoutée dans `deleteBook` pouvait lever une exception
+  (selon l'état de la base) et **bloquer toute la suppression**. Sécurisée (`objectStoreNames.contains` + try/catch),
+  et `library-view` affiche maintenant une vraie erreur si la suppression échoue. `version.js` → **2026.06.02.9**.
 - **Doc & version.** README + ce guide mis à jour ; correction « doigt ou Pencil » → **Apple Pencil uniquement** ;
   `version.js` → **2026.06.02.3**. App **publiée en ligne** sur GitHub Pages (cf. [[deploiement-en-ligne]] côté mémoire).
   Syntaxe ES vérifiée (`node --check`) + service HTTP local OK. Reste à valider sur iPad réel : micro `.m4a`,

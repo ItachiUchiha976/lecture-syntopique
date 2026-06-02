@@ -149,8 +149,13 @@ export async function renderLibrary() {
       okText: 'Supprimer', danger: true,
     });
     if (!ok) return;
-    await store.deleteBook(b.id);
-    toast('Livre supprimé.');
+    try {
+      await store.deleteBook(b.id);
+      toast('Livre supprimé.');
+    } catch (e) {
+      console.error('[delete]', e);
+      toast('Échec de la suppression : ' + (e.message || e), { type: 'error', duration: 5000 });
+    }
     refresh();
   }
 
