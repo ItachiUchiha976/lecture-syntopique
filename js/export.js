@@ -29,6 +29,15 @@ function drawMarksCanvas(ctx, marks, scale) {
       ctx.fillRect(m.rect.x * scale, m.rect.y * scale, m.rect.w * scale, m.rect.h * scale);
     } else if (m.type === 'highlight') {
       for (const q of m.quads) ctx.fillRect(q.x * scale, q.y * scale, q.w * scale, q.h * scale);
+    } else if (m.type === 'marker' && m.path && m.path.length) {
+      ctx.save();
+      ctx.strokeStyle = '#000'; ctx.lineWidth = (m.width || 0) * scale; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(m.path[0].x * scale, m.path[0].y * scale);
+      for (let k = 1; k < m.path.length; k++) ctx.lineTo(m.path[k].x * scale, m.path[k].y * scale);
+      if (m.path.length === 1) ctx.lineTo(m.path[0].x * scale + 0.1, m.path[0].y * scale);
+      ctx.stroke();
+      ctx.restore();
     } else if (m.type === 'lasso' && m.path && m.path.length > 2) {
       ctx.beginPath();
       ctx.moveTo(m.path[0].x * scale, m.path[0].y * scale);
@@ -49,6 +58,12 @@ function drawMarksLight(PDFLib, page, marks) {
       page.drawRectangle({ x: m.rect.x, y: H - m.rect.y - m.rect.h, width: m.rect.w, height: m.rect.h, color: black });
     } else if (m.type === 'highlight') {
       for (const q of m.quads) page.drawRectangle({ x: q.x, y: H - q.y - q.h, width: q.w, height: q.h, color: black });
+    } else if (m.type === 'marker' && m.path && m.path.length > 1) {
+      const w = m.width || 6;
+      const cap = PDFLib.LineCapStyle ? PDFLib.LineCapStyle.Round : undefined;
+      for (let k = 0; k < m.path.length - 1; k++) {
+        page.drawLine({ start: { x: m.path[k].x, y: H - m.path[k].y }, end: { x: m.path[k + 1].x, y: H - m.path[k + 1].y }, thickness: w, color: black, lineCap: cap });
+      }
     } else if (m.type === 'lasso' && m.path && m.path.length > 2) {
       // drawSvgPath : origine en haut-gauche, y vers le bas -> nos coordonnées conviennent.
       const d = 'M ' + m.path.map((p) => `${p.x} ${p.y}`).join(' L ') + ' Z';

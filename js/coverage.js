@@ -26,6 +26,15 @@ export function computeCoverage(marks, nativeW, nativeH) {
       ctx.fillRect(m.rect.x * scale, m.rect.y * scale, m.rect.w * scale, m.rect.h * scale);
     } else if (m.type === 'highlight') {
       for (const q of m.quads) ctx.fillRect(q.x * scale, q.y * scale, q.w * scale, q.h * scale);
+    } else if (m.type === 'marker' && m.path && m.path.length) {
+      ctx.save();
+      ctx.strokeStyle = '#000'; ctx.lineWidth = (m.width || 0) * scale; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(m.path[0].x * scale, m.path[0].y * scale);
+      for (let k = 1; k < m.path.length; k++) ctx.lineTo(m.path[k].x * scale, m.path[k].y * scale);
+      if (m.path.length === 1) ctx.lineTo(m.path[0].x * scale + 0.1, m.path[0].y * scale);
+      ctx.stroke();
+      ctx.restore();
     } else if (m.type === 'lasso' && m.path && m.path.length > 2) {
       ctx.beginPath();
       ctx.moveTo(m.path[0].x * scale, m.path[0].y * scale);

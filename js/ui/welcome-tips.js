@@ -112,10 +112,12 @@ function showUsageGuide() {
   ]);
   const card = el('div', { class: 'dialog usage-card', role: 'dialog', 'aria-modal': 'true' }, [
     el('h3', { text: '📖 Aide-mémoire' }),
-    item('🖊️', 'Censurer', 'Choisis un outil (▭ rectangle, ◌ forme libre, 🖊 surligneur), puis dessine à l’<strong>Apple Pencil</strong> — le doigt sert à faire défiler.'),
+    item('🖊️', 'Censurer', 'Choisis un outil — ▭ rectangle, ◌ forme libre, ou 🖊 <strong>surligneur (marqueur : trait épais)</strong> — puis dessine à l’<strong>Apple Pencil</strong>. Le doigt sert à faire défiler.'),
     item('▦', 'Ouvrir 2 PDF côte à côte', 'Dans la bibliothèque, bouton <strong>Comparer</strong> sur un livre → choisis le second. Le bouton <strong>⇄</strong> remplace un des deux.'),
     item('✔️', 'Censurer toute une page', 'Bouton <strong>Vérifier la censure</strong> : si plus de <strong>80 %</strong> est masqué, l’app propose de censurer toute la page (100 % = automatique).'),
-    item('♻️', 'Rétablir une censure', '<strong>↶</strong> annule le dernier tracé. Pour une page entièrement censurée : bouton <strong>Rétablir</strong> (ou <strong>Vérifier</strong> → Rétablir). Possible <strong>même après avoir fermé puis rouvert le PDF</strong> — tout est enregistré sur l’appareil.'),
+    item('♻️', 'Effacer / rétablir une censure', 'Prends la gomme <strong>⌫</strong> puis <strong>tape une censure du doigt</strong> pour retirer celle-là précisément (sans toucher aux autres). <strong>↶</strong> annule le dernier tracé. Page entière : bouton <strong>Rétablir</strong>. Réversible même après réouverture du PDF.'),
+    item('🔢', 'Aller à une page', 'Touche l’indicateur <strong>p.X</strong> en haut à droite pour sauter directement à un numéro de page — en lecture <strong>simple ET double</strong> (pratique pour les longs PDF).'),
+    item('📍', 'Reprise de lecture', 'À la réouverture d’un livre, tu retrouves <strong>automatiquement la dernière page lue</strong> (en double, chaque panneau reprend sa page).'),
     el('div', { class: 'welcome-foot' }, [
       el('span', { class: 'spacer' }),
       el('button', { class: 'btn btn--primary', text: 'Compris', onClick: () => close() }),

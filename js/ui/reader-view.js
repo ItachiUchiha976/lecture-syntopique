@@ -7,9 +7,9 @@ import { destroyDoc } from '../pdf-engine.js';
 import { createReaderPane } from './reader-pane.js';
 import { createSearchView } from './search-view.js';
 import { createToolbar } from './toolbar.js';
-import { toast, confirmDialog } from './dialogs.js';
+import { toast, confirmDialog, promptDialog } from './dialogs.js';
 import { computeCoverage } from '../coverage.js';
-import { getSetting } from '../storage.js';
+import { getSetting, getProgress } from '../storage.js';
 import { indexBook, isIndexed } from '../text-indexer.js';
 import { createReadingTracker } from '../reading-tracker.js';
 import { runExportFlow } from './export-flow.js';
@@ -20,7 +20,18 @@ export async function renderReader({ bookId, gotoPage = null, highlightQuery = n
   if (!isIndexed(book)) indexBook(book).catch((e) => console.warn('[index]', e));
 
   const tracker = createReadingTracker({ book, onProgress: updateProgressUI });
-  const pane = createReaderPane({ book, pdfDoc, dual: false, onActivePage: (i) => tracker.setActivePage(i) });
+  const pane = createReaderPane({ book, pdfDoc, dual: false, onActivePage: (i) => { tracker.setActivePage(i); updatePageLabel(i); } });
+
+  // ---- Aller à une page (saut direct, sans scroller longtemps) ----
+  function updatePageLabel(i) { if (gotoBtn) gotoBtn.textContent = `p.${(i || 0) + 1}`; }
+  async function gotoPage() {
+    const v = await promptDialog({ title: 'Aller à la page', message: `Numéro de page (1 à ${book.pageCount}) :`, type: 'number', okText: 'Aller' });
+    if (v == null) return;
+    const n = parseInt(String(v).trim(), 10);
+    if (!n || n < 1 || n > book.pageCount) { toast('Numéro de page invalide.'); return; }
+    pane.scrollToPage(n - 1);
+  }
+  const gotoBtn = el('button', { class: 'btn goto-page', text: 'p.1', title: 'Aller à une page…', onClick: () => gotoPage() });
 
   // ---- Vérifier la censure (page active) ----
   async function onVerify() {
@@ -119,6 +130,7 @@ export async function renderReader({ bookId, gotoPage = null, highlightQuery = n
     el('span', { class: 'title', text: book.title, title: book.title,
       style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '38vw' } }),
     el('span', { class: 'spacer' }),
+    gotoBtn,
     searchBtn,
   ]);
 
@@ -131,6 +143,12 @@ export async function renderReader({ bookId, gotoPage = null, highlightQuery = n
       if (highlightQuery) pane.highlightQuery(gotoPage, highlightQuery, 0);
       else pane.scrollToPage(gotoPage);
     }, 150);
+  } else {
+    // Reprise : rouvrir à la dernière page lue (si on n'arrive pas via la recherche).
+    try {
+      const prog = await getProgress(bookId);
+      if (prog && prog.lastPageIndex > 0) setTimeout(() => pane.scrollToPage(prog.lastPageIndex), 150);
+    } catch {}
   }
 
   return {

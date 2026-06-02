@@ -24,6 +24,7 @@ export function createReaderPane({ book, pdfDoc, dual = false, onActivePage = nu
   let cssW = 800;
   let rafPending = false;
   let pendingHL = null; // { pageIndex, normQuery, occ }
+  let hlTimeout = 0;    // surlignage de recherche TEMPORAIRE (s'efface tout seul)
   let scrollLock = null; // {top,left} figés pendant un tracé au stylet (palm rejection)
   let tool = 'none';    // outil de censure actif
   const MIN_ZOOM = 0.5, MAX_ZOOM = 3;
@@ -287,6 +288,10 @@ export function createReaderPane({ book, pdfDoc, dual = false, onActivePage = nu
     scrollToPageInternal(pageIndex);
     if (rendered.has(pageIndex) && rendered.get(pageIndex).textLayer) applyHighlight(pageIndex);
     else updateVisible();
+    // Surlignage TEMPORAIRE : on l'efface après quelques secondes (aide à localiser le mot,
+    // puis disparaît pour ne pas gêner la lecture).
+    clearTimeout(hlTimeout);
+    hlTimeout = setTimeout(() => clearHighlights(), 6000);
   }
   function clearHighlights() {
     const p = pendingHL; pendingHL = null;

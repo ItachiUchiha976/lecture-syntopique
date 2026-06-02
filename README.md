@@ -44,12 +44,14 @@ Deux options gratuites, de la plus simple à la plus classique :
 
 - **Importer** : bouton « Importer un PDF » → choisis un ou plusieurs PDF (Fichiers, iCloud, Drive…).
   Ils sont copiés **dans l'app** (stockage privé local). Rien à ranger dans un dossier.
-- **Lire** : touche « Ouvrir ». Fais défiler. Le **% lu** s'affiche en haut.
+- **Lire** : touche « Ouvrir ». Le **% lu** s'affiche en haut. L'app **rouvre automatiquement à la dernière page lue**.
+  Touche l'indicateur **p.X** (en haut à droite) pour **aller directement à une page** (en simple **et** en double).
 - **Comparer (lecture double)** : « Comparer » sur un livre → choisis le second → les deux s'affichent côte à côte.
   Le bouton **⇄** en haut de chaque colonne permet de **remplacer** un des deux PDF par un autre sans quitter la
   comparaison (pratique pour confronter un livre-ancre à plusieurs sources, l'une après l'autre).
 - **Censurer** (Apple Pencil uniquement ; le doigt fait défiler), 3 outils + gomme dans la barre d'outils :
-  - **▭ Rectangle**, **◌ Forme libre (lasso)**, **🖊️ Surligneur de texte**, **⌫ Gomme**, **↶ Annuler**.
+  - **▭ Rectangle**, **◌ Forme libre (lasso)**, **🖊️ Surligneur (marqueur : trait épais au stylet)**, **⌫ Gomme**, **↶ Annuler**.
+  - **Effacer une censure précise** : prends la **⌫ gomme** et **tape la censure du doigt** (seule celle-là est retirée).
   - **« Vérifier la censure »** : si la page est couverte à **> 80 %**, l'app propose de la **censurer entièrement** ;
     à 100 %, elle est marquée automatiquement. Tu peux **Rétablir** une page censurée à tout moment.
 - **Connexions vocales** (🎤) : enregistre à voix haute les liens que tu découvres entre les documents.

@@ -104,7 +104,11 @@ export async function renderLibrary() {
       badges.appendChild(el('span', { class: 'badge badge--work', text: 'OCR…' }));
 
     return el('div', { class: 'book-card' }, [
-      el('div', { class: 'book-card__thumb', onClick: () => open(b) }, [thumb || el('span', { text: 'PDF' })]),
+      el('div', { class: 'book-card__thumb', onClick: () => open(b) }, [
+        thumb || el('span', { text: 'PDF' }),
+        el('button', { class: 'book-card__del', html: '🗑', title: 'Supprimer ce livre',
+          onClick: (e) => { e.stopPropagation(); remove(b); } }),
+      ]),
       el('div', { class: 'book-card__body' }, [
         el('div', { class: 'book-card__title', text: b.title, title: b.title }),
         el('div', { class: 'book-card__meta', text: `${b.pageCount} page${b.pageCount > 1 ? 's' : ''} · ${formatBytes(b.byteSize)} · ${formatDate(b.importedAt)}` }),

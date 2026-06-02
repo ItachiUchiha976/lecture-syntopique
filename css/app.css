@@ -98,6 +98,18 @@ body {
 .book-card__actions { display: flex; border-top: 1px solid var(--line); margin-top: auto; }
 .book-card__actions .btn { flex: 1; border: none; border-radius: 0; background: transparent; min-height: 40px; font-size: .82rem; }
 .book-card__actions .btn + .btn { border-left: 1px solid var(--line); }
+/* Bouton de suppression bien visible dans le coin de la vignette */
+.book-card__thumb { position: relative; }
+.book-card__del {
+  position: absolute; top: 6px; right: 6px; width: 34px; height: 34px;
+  border-radius: 50%; background: rgba(15, 23, 42, .72); color: #fff;
+  border: 1px solid rgba(255, 255, 255, .28); display: grid; place-items: center;
+  font-size: .95rem; z-index: 3;
+}
+.book-card__del:active { transform: scale(.92); }
+
+/* Indicateur / saut de page (en-tête du lecteur) */
+.goto-page { padding: 0 10px; min-width: 50px; justify-content: center; font-variant-numeric: tabular-nums; font-size: .9rem; }
 
 /* ===== État vide ===== */
 .empty-state { display: grid; place-items: center; text-align: center; padding: 48px 16px; color: var(--text-dim); }

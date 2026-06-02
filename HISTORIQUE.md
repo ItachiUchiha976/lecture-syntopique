@@ -179,6 +179,42 @@ l'utilisation et `Guide d'installation.pdf` pour la mise en ligne et l'installat
 - **Correctif suppression de livre.** La purge des notes vocales ajoutée dans `deleteBook` pouvait lever une exception
   (selon l'état de la base) et **bloquer toute la suppression**. Sécurisée (`objectStoreNames.contains` + try/catch),
   et `library-view` affiche maintenant une vraie erreur si la suppression échoue. `version.js` → **2026.06.02.9**.
+
+## 9. Mises à jour (2026-06-03 — lot de corrections UX/recherche)
+
+- **Coordonnées du pointeur (censure côté droit + surligneur).** `censor.js` utilisait `e.offsetX/offsetY`, peu
+  fiables sur Safari quand le pointeur est **capturé** (deviennent relatifs à l'écran → décalage à droite d'une page
+  centrée, et hit-test du surligneur cassé). Remplacé par **`getBoundingClientRect()` + clientX/Y** → la censure et le
+  surligneur fonctionnent sur toute la page.
+- **Effacer une censure au doigt.** En mode gomme **⌫**, un **tap du doigt** sur une censure l'efface (juste celle-là,
+  via `eraseAt`) ; un glissé du doigt fait défiler. Distinction tap/glissé par seuil de mouvement (`panMoved`).
+- **Recherche : mots anglais manquants.** `text-normalize.js` passe de **NFD → NFKD** : décompose les **ligatures**
+  typographiques (`ﬁ→fi`, `ﬂ→fl`, `ﬀ→ff`…) très fréquentes en anglais → « find » trouve « ﬁnd », etc. `text-indexer.js`
+  joint les items avec une **espace** (meilleure séparation des mots). **`INDEX_VERSION = 2`** → ré-indexation
+  automatique des livres existants, en **préservant le texte OCR** déjà calculé (pas de ré-OCR).
+- **Surlignage de recherche temporaire.** `reader-pane.js` : le résultat cliqué est surligné (pulse ambre) et
+  **s'efface tout seul après ~6 s** ; défilement automatique vers le mot.
+- **Aller à une page.** Indicateur **p.X** tactile dans l'en-tête du lecteur (`reader-view.js`) → saisie d'un numéro
+  → saut direct (fini le scroll interminable vers la page 153).
+- **Suppression de livre découvrable.** Bouton **🗑** bien visible dans le coin de chaque vignette (`library-view.js`
+  + `app.css`), en plus du bouton « Suppr. ».
+- `version.js` → **2026.06.03.1**.
+
+## 10. Améliorations confort (2026-06-03)
+
+- **Reprendre à la dernière page lue.** À l'ouverture d'un livre (hors arrivée par la recherche), on défile à
+  `readingProgress.lastPageIndex` (`reader-view.js` ; en double, chaque panneau via `getProgress`). Le suivi de
+  lecture stockait déjà cette info.
+- **Saut de page en lecture double.** Indicateur **p.X** tactile dans l'en-tête du mode double (`dual-view.js`),
+  agissant sur le **panneau focalisé** ; le libellé suit le focus et la page active.
+- **Surligneur = marqueur robuste.** L'outil 🖊 ne dépend plus de la couche texte (fragile, nulle sur PDF scannés) :
+  il trace désormais une **bande épaisse** le long du tracé au stylet (nouveau type de masque **`marker`**
+  = `{ path[], width }`). Géré partout : `censor.js` (tracé + aperçu + effacement par proximité), `coverage.js`
+  (compte au masque de pixels), `export.js` (gravure raster **et** mode léger via `drawLine` à bouts ronds).
+  L'ancien type `highlight` (quads) reste lu pour compatibilité. `version.js` → **2026.06.03.2**.
+- **Aide-mémoire & README enrichis.** Les 3 nouveautés (reprise de lecture, saut de page simple+double, surligneur
+  marqueur, effacer au doigt) sont documentées dans la carte d'aide-mémoire à l'ouverture (`welcome-tips.js`) et le
+  README. `version.js` → **2026.06.03.3**.
 - **Doc & version.** README + ce guide mis à jour ; correction « doigt ou Pencil » → **Apple Pencil uniquement** ;
   `version.js` → **2026.06.02.3**. App **publiée en ligne** sur GitHub Pages (cf. [[deploiement-en-ligne]] côté mémoire).
   Syntaxe ES vérifiée (`node --check`) + service HTTP local OK. Reste à valider sur iPad réel : micro `.m4a`,

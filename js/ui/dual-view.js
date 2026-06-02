@@ -7,9 +7,9 @@ import { openBookDoc } from '../book-doc.js';
 import { destroyDoc } from '../pdf-engine.js';
 import { createReaderPane } from './reader-pane.js';
 import { createToolbar } from './toolbar.js';
-import { toast, confirmDialog } from './dialogs.js';
+import { toast, confirmDialog, promptDialog } from './dialogs.js';
 import { computeCoverage } from '../coverage.js';
-import { getSetting, getAllBooks } from '../storage.js';
+import { getSetting, getAllBooks, getProgress } from '../storage.js';
 import { indexBook, isIndexed } from '../text-indexer.js';
 import { createReadingTracker } from '../reading-tracker.js';
 import { createVoiceNotes } from './voice-notes.js';
@@ -22,8 +22,25 @@ export async function renderDual({ leftBookId, rightBookId }) {
   const trackerL = createReadingTracker({ book: left.book });
   const trackerR = createReadingTracker({ book: right.book });
 
-  const paneL = createReaderPane({ book: left.book, pdfDoc: left.pdfDoc, dual: true, onActivePage: (i) => trackerL.setActivePage(i) });
-  const paneR = createReaderPane({ book: right.book, pdfDoc: right.pdfDoc, dual: true, onActivePage: (i) => trackerR.setActivePage(i) });
+  const paneL = createReaderPane({ book: left.book, pdfDoc: left.pdfDoc, dual: true, onActivePage: (i) => { trackerL.setActivePage(i); if (focused === 'L') updateDualPageLabel(); } });
+  const paneR = createReaderPane({ book: right.book, pdfDoc: right.pdfDoc, dual: true, onActivePage: (i) => { trackerR.setActivePage(i); if (focused === 'R') updateDualPageLabel(); } });
+
+  // ---- Aller à une page (panneau focalisé) ----
+  function updateDualPageLabel() {
+    if (!gotoBtn) return;
+    const i = activePane().getActivePageIndex();
+    gotoBtn.textContent = `p.${(i < 0 ? 0 : i) + 1}`;
+  }
+  async function gotoPageDual() {
+    const pane = activePane(), book = activeBook();
+    const side = focused === 'L' ? 'gauche' : 'droit';
+    const v = await promptDialog({ title: 'Aller à la page', message: `Panneau ${side} — page (1 à ${book.pageCount}) :`, type: 'number', okText: 'Aller' });
+    if (v == null) return;
+    const n = parseInt(String(v).trim(), 10);
+    if (!n || n < 1 || n > book.pageCount) { toast('Numéro de page invalide.'); return; }
+    pane.scrollToPage(n - 1);
+  }
+  const gotoBtn = el('button', { class: 'btn goto-page', text: 'p.1', title: 'Aller à une page (panneau actif)', onClick: () => gotoPageDual() });
 
   let focused = 'L';
   const activePane = () => (focused === 'L' ? paneL : paneR);
@@ -36,6 +53,7 @@ export async function renderDual({ leftBookId, rightBookId }) {
     if (toolbar && toolbar.updateZoomLabel) toolbar.updateZoomLabel();
     // Les notes vocales listées suivent le livre focalisé.
     if (voice && voice.isOpen()) voice.refresh();
+    updateDualPageLabel();
   }
   paneL.element.addEventListener('pointerdown', () => setFocus('L'), true);
   paneR.element.addEventListener('pointerdown', () => setFocus('R'), true);
@@ -117,6 +135,7 @@ export async function renderDual({ leftBookId, rightBookId }) {
     backBtn,
     el('span', { class: 'title', html: '▦ Lecture double' }),
     el('span', { class: 'spacer' }),
+    gotoBtn,
   ]);
 
   const dual = el('div', { class: 'dual' }, [
@@ -129,6 +148,13 @@ export async function renderDual({ leftBookId, rightBookId }) {
 
   await trackerL.init();
   await trackerR.init();
+
+  // Reprise : chaque panneau rouvre à sa dernière page lue.
+  try {
+    const [pL, pR] = await Promise.all([getProgress(left.book.id), getProgress(right.book.id)]);
+    if (pL && pL.lastPageIndex > 0) setTimeout(() => paneL.scrollToPage(pL.lastPageIndex), 160);
+    if (pR && pR.lastPageIndex > 0) setTimeout(() => paneR.scrollToPage(pR.lastPageIndex), 200);
+  } catch {}
 
   return {
     element,

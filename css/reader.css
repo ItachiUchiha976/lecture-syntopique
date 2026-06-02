@@ -26,7 +26,11 @@
   -webkit-user-select: text; user-select: text; }
 .text-layer span { position: absolute; color: transparent; white-space: pre; transform-origin: 0 0; cursor: text; }
 .text-layer .hl { background: rgba(245,166,35,.45); border-radius: 2px; }
-.text-layer .hl--current { background: rgba(245,166,35,.85); }
+.text-layer .hl--current { background: rgba(245,166,35,.9); border-radius: 2px; animation: hl-pulse 0.9s ease-in-out 3; }
+@keyframes hl-pulse {
+  0%, 100% { background: rgba(245,166,35,.9); box-shadow: none; }
+  50% { background: rgba(245,166,35,1); box-shadow: 0 0 0 3px rgba(245,166,35,.45); }
+}
 
 .censor-layer { position: absolute; inset: 0; pointer-events: none; }
 

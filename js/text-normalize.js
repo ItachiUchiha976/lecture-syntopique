@@ -1,19 +1,22 @@
 // Normalisation de texte pour une recherche insensible à la CASSE et aux ACCENTS.
 // "batons" doit correspondre à "Bâtons", "BATONS", "BâTONS", "BaTOnS", etc.
 //
-// Méthode : décomposition Unicode (NFD) qui sépare lettre + diacritique, puis
-// suppression des diacritiques combinants, puis passage en minuscules.
+// Méthode : décomposition Unicode **NFKD** (compatibilité) qui sépare lettre + diacritique
+// ET décompose les LIGATURES typographiques fréquentes en anglais (ﬁ→fi, ﬂ→fl, ﬀ→ff…),
+// puis suppression des diacritiques combinants, puis passage en minuscules.
+// (NFKD au lieu de NFD : indispensable pour que « find » trouve « ﬁnd », « different »
+// trouve « diﬀerent », etc. — sinon ces mots anglais échappaient à la recherche.)
 
 const COMBINING = /[̀-ͯ]/g;
 
 // Normalise une chaîne entière (pour une requête de recherche).
 export function normalizeQuery(s) {
-  return String(s).normalize('NFD').replace(COMBINING, '').toLowerCase().trim();
+  return String(s).normalize('NFKD').replace(COMBINING, '').toLowerCase().trim();
 }
 
-// Normalise un caractère unique (transforme local : accents + casse).
+// Normalise un caractère unique (transforme local : accents + casse + ligatures).
 function normalizeChar(c) {
-  return c.normalize('NFD').replace(COMBINING, '').toLowerCase();
+  return c.normalize('NFKD').replace(COMBINING, '').toLowerCase();
 }
 
 // Construit la version normalisée d'un texte ET une table de correspondance

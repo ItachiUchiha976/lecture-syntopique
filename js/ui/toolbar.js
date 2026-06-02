@@ -6,7 +6,7 @@ const TOOLS = [
   { id: 'none', glyph: '✋', title: 'Lecture / déplacement (scroll, sélection texte)' },
   { id: 'rect', glyph: '▭', title: 'Censure : rectangle' },
   { id: 'lasso', glyph: '◌', title: 'Censure : forme libre (lasso)' },
-  { id: 'highlight', glyph: '🖊️', title: 'Censure : surligneur de texte' },
+  { id: 'highlight', glyph: '🖊️', title: 'Censure : surligneur (marqueur au stylet)' },
   { id: 'erase', glyph: '⌫', title: 'Gomme : effacer une censure' },
 ];
 
