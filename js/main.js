@@ -3,7 +3,7 @@ import { APP_VERSION } from '../version.js';
 import { register, startRouter, navigate } from './router.js';
 import { requestPersistence } from './storage.js';
 import { toast } from './ui/dialogs.js';
-import { showWelcomeTips } from './ui/welcome-tips.js';
+import { showWelcomeTips, showExitQuote } from './ui/welcome-tips.js';
 
 // ----- Service worker (offline + install) -----
 function registerSW() {
@@ -45,6 +45,10 @@ async function boot() {
   await startRouter('library');
   // Messages d'accueil (2 astuces + rappel quotidien), à chaque ouverture. Non bloquant.
   showWelcomeTips().catch((e) => console.warn('[tips]', e));
+  // Citation de sortie : quand l'app passe en arrière-plan (≈ quand on la quitte sur iPad).
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') showExitQuote();
+  });
 }
 
 boot().catch((e) => {

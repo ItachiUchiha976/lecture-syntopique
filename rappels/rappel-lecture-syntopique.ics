@@ -8,7 +8,7 @@ UID:rappel-lecture-syntopique-20260603@syntopique.local
 DTSTAMP:20260602T000000Z
 DTSTART:20260603T070000
 DTEND:20260603T071500
-RRULE:FREQ=DAILY;COUNT=184
+RRULE:FREQ=DAILY;COUNT=92
 SUMMARY:Lecture syntopique sur iPad 10
 DESCRIPTION:Ouvre l'app de Lecture Syntopique : lis et compare tes PDF, enregistre tes connexions vocales, puis memorise-les dans un palais de memoire.
 BEGIN:VALARM

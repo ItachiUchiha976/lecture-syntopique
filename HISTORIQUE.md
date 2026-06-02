@@ -136,12 +136,18 @@ l'utilisation et `Guide d'installation.pdf` pour la mise en ligne et l'installat
 - **Lecture double — échange rapide (⇄).** Bouton sur chaque colonne (`dual-view.js`) pour remplacer un des 2 PDF
   sans quitter la comparaison (livre-ancre vs sources successives). Choix assumé : **rester à 2 panneaux** (confort
   iPad 10 + charge cognitive + Adler).
-- **Messages d'accueil.** `ui/welcome-tips.js` (appelé depuis `main.js`) : 2 astuces à **chaque ouverture**
-  (palais de mémoire ; fusionner des PDF via une IA puis lire la fusion à côté de l'original). Case « Ne plus afficher »
-  (réglage `hideTips`).
-- **Rappel quotidien 07h00 / 6 mois.** Bouton sur la carte d'accueil → ouvre **Google Agenda** avec un évènement
-  récurrent prérempli (1 tap « Enregistrer ») ; repli fichier `rappels/rappel-lecture-syntopique.ics`
-  (`RRULE:FREQ=DAILY;COUNT=184`). Une PWA iOS ne peut pas créer de notification système fiable → on passe par l'agenda.
+- **Messages d'accueil.** `ui/welcome-tips.js` (appelé depuis `main.js`) : **2 astuces permanentes** à chaque
+  ouverture (palais de mémoire 🧠 + notes vocales 🎤). **Plus de case « Ne plus afficher »** (les astuces s'affichent
+  toujours, demande du 2026-06-02).
+- **Rappel quotidien 07h00 / 3 mois** (durée ramenée de 6 à 3 mois). Bouton sur la carte d'accueil → ouvre **Google
+  Agenda** avec un évènement récurrent prérempli (1 tap « Enregistrer ») ; repli `rappels/rappel-lecture-syntopique.ics`
+  (`RRULE:FREQ=DAILY;COUNT=92`). **Bloc conditionnel** : visible tant que `reminderDone` est faux ; le clic « Activer »
+  pose `reminderDone`/`reminderDoneAt` → le bloc disparaît ; bouton **« Me le rappeler dans 3 mois »** (`reminderSnoozeUntil`) ;
+  réapparition auto ~80 j après activation (avant l'expiration). Limite assumée : une PWA ne peut pas lire le Google
+  Agenda → l'app sait seulement si l'utilisateur a cliqué « Activer ».
+- **Citation de sortie.** `showExitQuote()` : pop-up **plein écran** (citation Steve Jobs) déclenché sur
+  `visibilitychange → hidden` (≈ quand on quitte l'app sur iPad), une fois par session.
 - **Doc & version.** README + ce guide mis à jour ; correction « doigt ou Pencil » → **Apple Pencil uniquement** ;
-  `version.js` → **2026.06.02.2**. Syntaxe ES vérifiée (`node --check`, 9 modules, 0 erreur) + service HTTP local OK.
-  Reste à valider sur iPad réel : autorisation micro, enregistrement `.m4a`, feuille de partage (Drive / Claude).
+  `version.js` → **2026.06.02.3**. App **publiée en ligne** sur GitHub Pages (cf. [[deploiement-en-ligne]] côté mémoire).
+  Syntaxe ES vérifiée (`node --check`) + service HTTP local OK. Reste à valider sur iPad réel : micro `.m4a`,
+  partage (Drive/Claude), et l'affichage de la citation de sortie.

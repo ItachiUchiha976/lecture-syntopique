@@ -207,5 +207,12 @@ body {
 .welcome-hide { display: flex; align-items: center; gap: 6px; color: var(--text-dim); font-size: .82rem; cursor: pointer; }
 .welcome-hide input { width: 18px; height: 18px; }
 
+/* ===== Citation de sortie (plein écran) ===== */
+.exit-overlay { background: linear-gradient(160deg, #0b1220, #1e293b); backdrop-filter: blur(6px); }
+.exit-card { max-width: 620px; text-align: center; padding: 28px 24px; }
+.exit-quote { font-size: 1.55rem; line-height: 1.45; color: var(--text); font-weight: 600; font-style: italic; }
+.exit-author { margin-top: 18px; color: var(--accent); font-size: 1rem; letter-spacing: .6px; font-weight: 700; }
+.exit-dismiss { margin-top: 28px; }
+
 .hidden { display: none !important; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

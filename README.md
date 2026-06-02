@@ -78,17 +78,21 @@ Deux options gratuites, de la plus simple à la plus classique :
 
 ---
 
-## 5) Messages d'accueil & rappel quotidien
+## 5) Messages d'accueil, rappel quotidien & citation de sortie
 
-- À **chaque ouverture**, l'app affiche une petite carte avec deux rappels : (1) penser à **mémoriser les
-  connexions** dans un *palais de mémoire* ; (2) tu peux **fusionner des PDF via une IA**, puis lire la fusion
-  à côté d'une source originale pour comparer l'avis de l'IA avec celui de l'auteur. (Case « Ne plus afficher »
-  pour la masquer.)
-- **Rappel quotidien 07h00 (6 mois)** : sur cette carte, le bouton **« ⏰ Activer le rappel quotidien »** ouvre
-  **Google Agenda** avec un évènement récurrent prêt à enregistrer (un seul tap → « Enregistrer »). L'heure est
-  pré-réglée sur 07h00 (fuseau Europe/Paris — modifiable avant d'enregistrer).
+- À **chaque ouverture**, l'app affiche une petite carte avec **deux rappels permanents** : (1) penser à
+  **mémoriser les connexions** dans un *palais de mémoire* ; (2) enregistrer tes **connexions vocales**
+  (bouton 🎤) puis les partager à une IA. *(Ces deux messages s'affichent toujours.)*
+- **Rappel quotidien 07h00 (3 mois)** : sur cette carte, le bouton **« ⏰ Activer le rappel quotidien »** ouvre
+  **Google Agenda** avec un évènement récurrent prêt à enregistrer (un seul tap → « Enregistrer ») ; heure
+  pré-réglée sur 07h00 (fuseau Europe/Paris, modifiable avant d'enregistrer).
+  - Une fois activé, **le bloc disparaît** (l'app retient que tu as cliqué « Activer ») et **réapparaît**
+    automatiquement avant la fin des ~3 mois pour que tu le recrées. Bouton **« Me le rappeler dans 3 mois »**
+    pour le reporter. *(Une PWA ne peut pas lire ton Google Agenda : l'app sait seulement si tu as cliqué.)*
   - *Alternative hors-ligne* : le fichier `rappels/rappel-lecture-syntopique.ics` peut être ouvert sur l'iPad
-    (ajout au calendrier) ou importé dans Google Agenda (Réglages → Importer/Exporter).
+    (ajout au calendrier) ou importé dans Google Agenda (Réglages → Importer).
+- **Citation de sortie** : quand tu **quittes / mets l'app en arrière-plan**, un pop-up **plein écran** affiche
+  une citation de motivation (Steve Jobs). Tu la vois en partant et elle t'attend à ton retour ; touche pour fermer.
 
 ## 6) Détails techniques (pour info)
 
