@@ -8,13 +8,23 @@ import { createReaderPane } from './reader-pane.js';
 import { createSearchView } from './search-view.js';
 import { createToolbar } from './toolbar.js';
 import { toast, promptDialog } from './dialogs.js';
-import { getProgress } from '../storage.js';
+import { getProgress, getBook } from '../storage.js';
 import { indexBook, isIndexed } from '../text-indexer.js';
+import { ensureBookSearchable } from './ocr-gate.js';
 import { createReadingTracker } from '../reading-tracker.js';
 import { runExportFlow } from './export-flow.js';
 import { createVoiceNotes } from './voice-notes.js';
 
 export async function renderReader({ bookId, gotoPage = null, highlightQuery = null }) {
+  // Verrou OCR : un PDF scanné doit être cherchable AVANT lecture. Couvre aussi le rechargement de
+  // l'app directement sur cette route (qui court-circuite le verrou de la bibliothèque). Idempotent :
+  // instantané pour un PDF natif ou déjà reconnu.
+  const book0 = await getBook(bookId);
+  if (book0 && !(await ensureBookSearchable(book0))) {
+    // « Retour à la bibliothèque » : on y revient (différé pour ne pas perturber le routeur en plein montage).
+    setTimeout(() => navigate('library', {}, { replace: true }), 0);
+    return { element: el('div', { class: 'view' }), destroy() {} };
+  }
   const { book, pdfDoc } = await openBookDoc(bookId);
   if (!isIndexed(book)) indexBook(book).catch((e) => console.warn('[index]', e));
 
@@ -33,6 +43,7 @@ export async function renderReader({ bookId, gotoPage = null, highlightQuery = n
     const n = parseInt(String(v).trim(), 10);
     if (!n || n < 1 || n > book.pageCount) { toast('Numéro de page invalide.'); return; }
     pane.scrollToPage(n - 1);
+    pane.clearHighlights(); // saut de page volontaire → on retire le surlignage de recherche
   }
   const gotoBtn = el('button', { class: 'btn goto-page', text: 'p.1', title: 'Aller à une page…', onClick: () => gotoPage() });
 
@@ -120,7 +131,12 @@ export async function renderReader({ bookId, gotoPage = null, highlightQuery = n
   const backBtn = el('button', { class: 'btn btn-icon', html: '‹', title: 'Retour à la bibliothèque',
     onClick: () => navigate('library') });
   const searchBtn = el('button', { class: 'btn btn-icon', html: '🔍', title: 'Rechercher',
-    onClick: () => (search.isOpen() ? search.close() : search.open()) });
+    onClick: () => {
+      if (search.isOpen()) { search.close(); return; }
+      // Rouvrir la recherche efface le surlignage précédent (« jusqu'à ce que je quitte la recherche »).
+      pane.clearHighlights();
+      search.open();
+    } });
   const header = el('header', { class: 'app-header' }, [
     backBtn,
     el('span', { class: 'title', text: book.title, title: book.title,

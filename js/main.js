@@ -1,7 +1,7 @@
 // Point d'entrée de l'app.
 import { APP_VERSION } from '../version.js';
 import { register, startRouter, navigate } from './router.js';
-import { requestPersistence } from './storage.js';
+import { requestPersistence, getSetting, setSetting } from './storage.js';
 import { toast } from './ui/dialogs.js';
 import { showWelcomeTips, showExitQuote, showPostureReminder } from './ui/welcome-tips.js';
 
@@ -50,6 +50,54 @@ function setupRoutes() {
   register('dual', async (params) => (await import('./ui/dual-view.js')).renderDual(params));
 }
 
+// Pré-chargement hors-ligne (one-shot) : exerce les bibliothèques chargées PARESSEUSEMENT (OCR,
+// export, worker PDF) pendant qu'on est EN LIGNE, pour qu'elles soient mises en cache par le service
+// worker. Sans ça, la 1ʳᵉ utilisation de l'OCR/export EN HORS-LIGNE échouerait (vendor non encore caché).
+async function warmOfflineCache() {
+  if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) return; // pas de SW actif → on retentera
+  try { if (await getSetting('offlineWarmDone')) return; } catch {}
+  const base = new URL('./', location.href).href;
+  const files = [
+    // Modules d'app chargés paresseusement (réseau-d'abord → mis en cache à ce fetch) : lecteur,
+    // export, notes vocales… pour qu'ils marchent hors-ligne même sans avoir été ouverts en ligne.
+    'js/ui/reader-view.js', 'js/ui/reader-pane.js', 'js/ui/dual-view.js', 'js/ui/search-view.js',
+    'js/ui/export-flow.js', 'js/export.js', 'js/ui/voice-notes.js', 'js/voice-recorder.js',
+    // Bibliothèques tierces vendorisées (lourdes, chargées à la demande) :
+    'vendor/pdf-lib/pdf-lib.min.js',
+    'vendor/pdfjs/pdf.worker.min.mjs',
+    'vendor/tesseract/tesseract.min.js',
+    'vendor/tesseract/worker.min.js',
+    'vendor/tesseract/lang/eng.traineddata.gz',
+    'vendor/tesseract/lang/fra.traineddata.gz',
+    // Cœurs LSTM les plus probables sur iPad/Safari (si Safari en choisit un autre, le 1ᵉʳ OCR en ligne le cachera).
+    'vendor/tesseract/tesseract-core-relaxedsimd-lstm.js',
+    'vendor/tesseract/tesseract-core-relaxedsimd-lstm.wasm',
+    'vendor/tesseract/tesseract-core-relaxedsimd-lstm.wasm.js',
+    'vendor/tesseract/tesseract-core-simd-lstm.js',
+    'vendor/tesseract/tesseract-core-simd-lstm.wasm',
+    'vendor/tesseract/tesseract-core-simd-lstm.wasm.js',
+  ];
+  let allOk = true;
+  for (const f of files) {
+    try { const r = await fetch(new URL(f, base)); if (!r || !r.ok) allOk = false; }
+    catch { allOk = false; }
+  }
+  if (allOk) { try { await setSetting('offlineWarmDone', true); } catch {} } // sinon on retentera au prochain lancement
+}
+
+// Échap ferme la carte d'accueil / l'aide-mémoire / la pause posture / la citation (en plus du tap).
+function bindEscapeForOverlays() {
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const ov = document.querySelector('.welcome-overlay, .usage-overlay, .posture-overlay, .exit-overlay');
+    if (!ov) return;
+    // Cibler EXPLICITEMENT le bouton de fermeture (et NON un `.btn` nu : sur l'accueil, le 1ᵉʳ .btn en
+    // ordre document est le lien « Activer le rappel » → Échap l'aurait déclenché au lieu de fermer).
+    const btn = ov.querySelector('.welcome-foot .btn') || ov.querySelector('.exit-dismiss') || ov.querySelector('.dialog__actions .btn');
+    if (btn) { e.preventDefault(); btn.click(); }
+  });
+}
+
 async function boot() {
   registerSW();
   setupRoutes();
@@ -58,6 +106,13 @@ async function boot() {
     if (!granted) console.info('[storage] persistance non accordée (sera retentée).');
   });
   await startRouter('library');
+  // Reprise des OCR interrompus (l'utilisateur avait fait « Retour à la bibliothèque » puis fermé
+  // l'app) : relance en arrière-plan les livres restés en attente, et résorbe l'indicateur « OCR… »
+  // resté affiché alors qu'aucun worker ne tournait. Non bloquant, import paresseux de Tesseract.
+  import('./ocr.js').then((m) => m.ocrAllPending()).catch((e) => console.warn('[ocr] resume', e));
+  bindEscapeForOverlays();
+  // Pré-charge les bibliothèques lourdes pour un vrai hors-ligne (différé, en arrière-plan, une seule fois).
+  setTimeout(() => { warmOfflineCache().catch((e) => console.warn('[offline] warm', e)); }, 5000);
   // Messages d'accueil (2 astuces + rappel quotidien), à chaque ouverture. Non bloquant.
   showWelcomeTips().catch((e) => console.warn('[tips]', e));
   // Citation de sortie : quand l'app passe en arrière-plan (≈ quand on la quitte sur iPad).

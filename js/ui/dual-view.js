@@ -8,14 +8,21 @@ import { destroyDoc } from '../pdf-engine.js';
 import { createReaderPane } from './reader-pane.js';
 import { createToolbar } from './toolbar.js';
 import { toast, promptDialog } from './dialogs.js';
-import { getAllBooks, getProgress } from '../storage.js';
+import { getAllBooks, getProgress, getBook } from '../storage.js';
 import { indexBook, isIndexed } from '../text-indexer.js';
+import { ensureBookSearchable } from './ocr-gate.js';
 import { createReadingTracker } from '../reading-tracker.js';
 import { createVoiceNotes } from './voice-notes.js';
 import { createSearchView } from './search-view.js';
 import { runExportFlow } from './export-flow.js';
 
 export async function renderDual({ leftBookId, rightBookId }) {
+  // Verrou OCR sur les DEUX livres (couvre aussi le rechargement de l'app directement sur cette route).
+  const [lb0, rb0] = await Promise.all([getBook(leftBookId), getBook(rightBookId)]);
+  if ((lb0 && !(await ensureBookSearchable(lb0))) || (rb0 && !(await ensureBookSearchable(rb0)))) {
+    setTimeout(() => navigate('library', {}, { replace: true }), 0);
+    return { element: el('div', { class: 'view' }), destroy() {} };
+  }
   const left = await openBookDoc(leftBookId);
   const right = await openBookDoc(rightBookId);
   for (const b of [left.book, right.book]) if (!isIndexed(b)) indexBook(b).catch(() => {});
@@ -44,6 +51,7 @@ export async function renderDual({ leftBookId, rightBookId }) {
     const n = parseInt(String(v).trim(), 10);
     if (!n || n < 1 || n > book.pageCount) { toast('Numéro de page invalide.'); return; }
     pane.scrollToPage(n - 1);
+    pane.clearHighlights(); // saut de page volontaire → on retire le surlignage de recherche
   }
   const gotoBtn = el('button', { class: 'btn goto-page', text: 'p.1', title: 'Aller à une page (panneau actif)', onClick: () => gotoPageDual() });
 
@@ -159,7 +167,12 @@ export async function renderDual({ leftBookId, rightBookId }) {
     },
   });
   const searchBtn = el('button', { class: 'btn btn-icon', html: '🔍', title: 'Rechercher (panneau actif)',
-    onClick: () => (search.isOpen() ? search.close() : search.open()) });
+    onClick: () => {
+      if (search.isOpen()) { search.close(); return; }
+      // Rouvrir la recherche efface le surlignage précédent (« jusqu'à ce que je quitte la recherche »).
+      paneL.clearHighlights(); paneR.clearHighlights();
+      search.open();
+    } });
 
   // ---- Échange rapide d'un des deux livres (comparer un livre-ancre contre plusieurs sources) ----
   async function pickBook(title, onPick) {
@@ -177,9 +190,17 @@ export async function renderDual({ leftBookId, rightBookId }) {
     document.body.appendChild(overlay);
   }
   const swapL = el('button', { class: 'btn btn-icon dual-swap', html: '⇄', title: 'Changer le livre de gauche',
-    onClick: () => pickBook('Remplacer le livre de gauche par…', (id) => navigate('dual', { leftBookId: id, rightBookId: right.book.id })) });
+    onClick: () => pickBook('Remplacer le livre de gauche par…', async (id) => {
+      const nb = await getBook(id);
+      if (nb && !(await ensureBookSearchable(nb))) return; // verrou OCR sur le nouveau livre
+      navigate('dual', { leftBookId: id, rightBookId: right.book.id });
+    }) });
   const swapR = el('button', { class: 'btn btn-icon dual-swap', html: '⇄', title: 'Changer le livre de droite',
-    onClick: () => pickBook('Remplacer le livre de droite par…', (id) => navigate('dual', { leftBookId: left.book.id, rightBookId: id })) });
+    onClick: () => pickBook('Remplacer le livre de droite par…', async (id) => {
+      const nb = await getBook(id);
+      if (nb && !(await ensureBookSearchable(nb))) return; // verrou OCR sur le nouveau livre
+      navigate('dual', { leftBookId: left.book.id, rightBookId: id });
+    }) });
 
   const backBtn = el('button', { class: 'btn btn-icon', html: '‹', title: 'Retour', onClick: () => navigate('library') });
   const titleL = el('span', { class: 'dual-title', text: left.book.title, title: left.book.title });

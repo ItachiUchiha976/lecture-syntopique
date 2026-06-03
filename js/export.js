@@ -182,7 +182,14 @@ export async function exportFilteredPdf(book, { onProgress = null } = {}) {
   const out = await PDFLib.PDFDocument.create();
   const font = await out.embedFont(StandardFonts.Helvetica);
   const srcDoc = await PDFLib.PDFDocument.load(srcBytes, { ignoreEncryption: true }); // pour copier les pages intactes
-  const pdfDoc = await loadDocument(srcBytes.slice());                                // pour rasteriser + texte natif
+  let pdfDoc;                                                                          // pour rasteriser + texte natif
+  try { pdfDoc = await loadDocument(srcBytes.slice()); }
+  catch (e) {
+    if (e && (e.name === 'PasswordException' || /password|protégé/i.test(String(e.message || '')))) {
+      throw new Error('Ce PDF est protégé par un mot de passe : l’export n’est pas disponible.');
+    }
+    throw e;
+  }
 
   const total = book.pageCount;
   const langs = (await store.getSetting('ocrLangs')) || 'eng+fra';
@@ -231,8 +238,13 @@ export async function exportFilteredPdf(book, { onProgress = null } = {}) {
         // Prépare la couche texte AVANT de libérer le canvas (l'OCR en a besoin).
         const rotated = ((pjs.rotate || 0) % 360) !== 0; // sur page pivotée, le texte natif et l'image ne partagent
                                                           // pas le même repère -> on s'abstient (image seule, pas de fuite).
+        // CropBox décalée de la MediaBox (view[0]/[1] ≠ 0) : le texte natif (repère MediaBox) et l'image
+        // rasterisée (repère CropBox) ne coïncident pas → on s'abstient AUSSI (sinon risque de désalignement,
+        // voire de réinjecter un mot censuré mal détecté). Image seule = pas de fuite.
+        const view = pjs.view || null;
+        const cropOffset = !!(view && (Math.abs(view[0]) > 0.5 || Math.abs(view[1]) > 0.5));
         let nativeItems = null, ocrWords = null;
-        if (hasNativeText && !rotated) { try { nativeItems = (await pjs.getTextContent()).items; } catch {} }
+        if (hasNativeText && !rotated && !cropOffset) { try { nativeItems = (await pjs.getTextContent()).items; } catch {} }
         else if (!hasNativeText) { try { ocrWords = await ocrCanvasWords(canvas, langs); usedOcr = true; } catch (e) { console.warn('[export] ocr', idx + 1, e); } }
         pjs.cleanup();
 

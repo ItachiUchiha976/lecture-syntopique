@@ -1,5 +1,5 @@
 // Assistant d'export du PDF filtré : avertissement -> récap -> choix gravure -> génération.
-import { el } from '../utils.js';
+import { el, formatBytes } from '../utils.js';
 import { toast, confirmDialog, alertDialog } from './dialogs.js';
 import { exportFilteredPdf } from '../export.js';
 import * as store from '../storage.js';
@@ -66,6 +66,18 @@ export async function runExportFlow({ book }) {
     okText: 'Exporter', cancelText: 'Annuler',
   });
   if (!ok) return;
+
+  // Garde-fou mémoire iPad : export potentiellement lourd (gros fichier ou beaucoup de pages à
+  // graver) → on prévient, comme le fait la sauvegarde au-delà de 150 Mo.
+  const rasterPages = pages.filter((p) => (p.censorMarks || []).length).length;
+  if ((book.byteSize || 0) > 120 * 1024 * 1024 || rasterPages > 150) {
+    const go = await confirmDialog({
+      title: 'Export volumineux',
+      message: `Ce livre est volumineux (${formatBytes(book.byteSize || 0)}${rasterPages ? `, ${rasterPages} page(s) à graver` : ''}). La génération charge tout en mémoire : sur iPad, ça peut être lent, voire saturer la mémoire.\nContinuer quand même ?`,
+      okText: 'Continuer', cancelText: 'Annuler',
+    });
+    if (!go) return;
+  }
 
   const prog = progressDialog('Génération du PDF filtré…');
   try {

@@ -2,6 +2,31 @@
 // Insensible à la casse et aux accents. Portée : livre courant ou tous les livres.
 import * as store from './storage.js';
 import { normalizeQuery, buildNormIndex } from './text-normalize.js';
+import { onOcrProgress } from './ocr.js';
+import { onIndexProgress } from './text-indexer.js';
+
+// Cache LÉGER des pages par livre pour la recherche : { pageIndex, text, textNorm } SANS `ocrWords`
+// (les positions de mots OCR sont volumineuses et inutiles ici). Évite de relire tous les records de
+// page — `ocrWords` compris — à CHAQUE frappe. Invalidé quand l'OCR/indexation modifie un texte.
+const _searchCache = new Map(); // bookId -> [{ pageIndex, text, textNorm }]
+// Invalide le cache : un livre précis (bookId) ou tout (sans argument). Exporté pour que la suppression
+// et la restauration d'un livre forcent une relecture (sinon des résultats périmés après delete+restore).
+export function clearSearchCache(bookId) { if (bookId == null) _searchCache.clear(); else _searchCache.delete(bookId); }
+onOcrProgress((e) => { if (e && (e.finished || e.failed)) clearSearchCache(); });
+onIndexProgress((e) => { if (e && e.finished) clearSearchCache(); });
+
+async function pagesForSearch(bookId) {
+  let arr = _searchCache.get(bookId);
+  if (!arr) {
+    const pages = await store.getPagesByBook(bookId);
+    arr = pages
+      .filter((p) => p.textNorm)
+      .map((p) => ({ pageIndex: p.pageIndex, text: p.text || '', textNorm: p.textNorm }))
+      .sort((a, b) => a.pageIndex - b.pageIndex);
+    _searchCache.set(bookId, arr);
+  }
+  return arr;
+}
 
 function makeSnippet(text, q) {
   if (!text) return '';
@@ -35,8 +60,7 @@ export async function searchText(query, { scope = 'book', bookId = null, openBoo
   const results = [];
   let totalOccurrences = 0;
   for (const b of books) {
-    const pages = await store.getPagesByBook(b.id);
-    pages.sort((a, b2) => a.pageIndex - b2.pageIndex);
+    const pages = await pagesForSearch(b.id); // léger + mis en cache (sans ocrWords)
     for (const p of pages) {
       if (!p.textNorm) continue;
       let count = 0, idx = p.textNorm.indexOf(q);

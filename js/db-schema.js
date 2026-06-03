@@ -49,7 +49,11 @@ export function getDB() {
       // Les futures migrations (DB_VERSION > 2) viendront ici.
     },
     blocked() { console.warn('[db] mise à jour bloquée par un autre onglet'); },
-    blocking() { /* un autre onglet veut migrer : on pourrait fermer ici */ },
+    blocking() {
+      // Un autre contexte veut migrer vers une version plus récente : on FERME notre connexion
+      // pour ne pas bloquer l'upgrade (sinon getDB() ailleurs ne résoudrait jamais → boot figé).
+      if (_dbPromise) { _dbPromise.then((db) => { try { db.close(); } catch {} }).catch(() => {}); _dbPromise = null; }
+    },
   });
   return _dbPromise;
 }

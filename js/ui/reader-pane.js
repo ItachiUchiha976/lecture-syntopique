@@ -23,8 +23,7 @@ export function createReaderPane({ book, pdfDoc, dual = false, onActivePage = nu
   let processing = false;
   let cssW = 800;
   let rafPending = false;
-  let pendingHL = null; // { pageIndex, normQuery, occ }
-  let hlTimeout = 0;    // surlignage de recherche TEMPORAIRE (s'efface tout seul)
+  let pendingHL = null; // { pageIndex, normQuery, occ } — surlignage de recherche en cours (persistant)
   let scrollLock = null; // {top,left} figés pendant un tracé au stylet (palm rejection)
   let tool = 'none';    // outil de censure actif
   const MIN_ZOOM = 0.35, MAX_ZOOM = 3; // 0.35 → permet de réduire pour voir la page entière
@@ -114,26 +113,37 @@ export function createReaderPane({ book, pdfDoc, dual = false, onActivePage = nu
       wrap.querySelector('.page-placeholder')?.remove();
       wrap.appendChild(canvas);
 
+      // Échelle/dimensions d'affichage (px CSS par unité PDF) fixées DÈS le rendu du canvas, HORS de
+      // tout try qui pourrait lever : indispensables pour positionner correctement le calque de
+      // surlignage OCR (pages scannées). Sans cela, un échec de la couche texte les laisserait nuls
+      // → rectangles mal échelonnés.
+      entry.dispScale = plan.cssW / nativeSizes[i].w;
+      entry.cssW = plan.cssW; entry.cssH = plan.cssH;
+
+      // Enregistrement de la page (texte OCR + censure) lu UNE seule fois et réutilisé plus bas.
+      let rec = null;
+      try { rec = await store.getPage(book.id, i); } catch {}
+      if (entry.cancelled) return;
+      entry.ocrWords = (rec && rec.ocrWords) || null; // mots OCR (positions) pour surligner sur un scan
+
       // Couche de texte sélectionnable (échelle d'AFFICHAGE)
       try {
-        const dispScale = plan.cssW / nativeSizes[i].w;
-        const dispVp = page.getViewport({ scale: dispScale });
+        const dispVp = page.getViewport({ scale: entry.dispScale });
         const tlDiv = el('div', { class: 'text-layer' });
         tlDiv.style.width = plan.cssW + 'px';
         tlDiv.style.height = plan.cssH + 'px';
         wrap.appendChild(tlDiv);
         const tl = await buildTextLayer(page, dispVp, tlDiv);
         if (entry.cancelled) { tlDiv.remove(); }
-        else {
-          entry.textLayer = { div: tlDiv, items: tl.textContentItemsStr || [], divs: tl.textDivs || [] };
-          if (pendingHL && pendingHL.pageIndex === i) applyHighlight(i);
-        }
+        else entry.textLayer = { div: tlDiv, items: tl.textContentItemsStr || [], divs: tl.textDivs || [] };
       } catch (e) { /* couche texte non bloquante */ }
+
+      // Surlignage de recherche en attente : UN SEUL appel, maintenant que la couche texte ET les
+      // mots OCR sont connus → couvre le cas natif (<span>) comme le cas scanné (calque de rectangles).
+      if (!entry.cancelled && pendingHL && pendingHL.pageIndex === i) applyHighlight(i);
 
       // Couche de censure (au-dessus de la couche texte)
       try {
-        let rec = null;
-        try { rec = await store.getPage(book.id, i); } catch {}
         const initialMarks = (rec && rec.censorMarks) || [];
         if (rec && rec.censored) censoredPages.add(i);
         if (!entry.cancelled) {
@@ -169,6 +179,7 @@ export function createReaderPane({ book, pdfDoc, dual = false, onActivePage = nu
     if (entry.task && entry.task.cancel) { try { entry.task.cancel(); } catch {} }
     if (entry.canvas) { entry.canvas.remove(); freeCanvas(entry.canvas); }
     if (entry.textLayer && entry.textLayer.div) entry.textLayer.div.remove();
+    if (entry.ocrHlLayer) { entry.ocrHlLayer.remove(); entry.ocrHlLayer = null; }
     if (entry.censor) { try { entry.censor.destroy(); } catch {} }
     if (entry.overlay) { entry.overlay.remove(); entry.overlay = null; }
     rendered.delete(i);
@@ -267,49 +278,107 @@ export function createReaderPane({ book, pdfDoc, dual = false, onActivePage = nu
   }
 
   // ---- Surlignage de recherche ----
+  // Calque de surlignage pour les pages SCANNÉES (pas de couche texte) : rectangles ambre posés
+  // aux positions des mots OCR. Créé à la demande, retiré avec la page.
+  function ensureOcrHlLayer(i, entry) {
+    if (entry.ocrHlLayer) return entry.ocrHlLayer;
+    const layer = el('div', { class: 'ocr-hl-layer' });
+    if (entry.cssH) { layer.style.width = entry.cssW + 'px'; layer.style.height = entry.cssH + 'px'; }
+    wraps[i].appendChild(layer);
+    entry.ocrHlLayer = layer;
+    return layer;
+  }
+  function removeOcrHlLayer(entry) {
+    if (entry && entry.ocrHlLayer) { entry.ocrHlLayer.remove(); entry.ocrHlLayer = null; }
+  }
+
   function applyHighlight(i) {
     const entry = rendered.get(i);
-    if (!entry || !entry.textLayer) return;
-    const { items, divs } = entry.textLayer;
-    divs.forEach((d) => d && d.classList.remove('hl', 'hl--current'));
+    if (!entry) return;
+    // Nettoie l'ancien surlignage (texte natif + calque OCR scanné).
+    if (entry.textLayer) entry.textLayer.divs.forEach((d) => d && d.classList.remove('hl', 'hl--current'));
+    removeOcrHlLayer(entry);
     if (!pendingHL || pendingHL.pageIndex !== i || !pendingHL.normQuery) return;
-    // Même séparateur que l'indexeur (text-indexer joint les items avec UNE espace) : sinon
-    // une requête multi-mots (« palais mémoire ») figure dans la liste mais ne se surligne pas.
-    const SEP = ' ';
-    const joined = items.join(SEP);
+
+    // Discriminant FIABLE : une page OCRisée (scannée) possède entry.ocrWords ; une page native a
+    // sa couche texte. (Un scan peut renvoyer une couche texte vide/parasite via getTextContent, d'où
+    // ce choix par présence de mots OCR plutôt que par .items.length.) Le repérage des correspondances
+    // est IDENTIQUE dans les deux cas (items joints par UNE espace, comme l'indexeur → multi-mots OK) :
+    // page native → on surligne les <span> ; page scannée → rectangles aux positions des mots OCR.
+    const useOcr = !!(entry.ocrWords && entry.ocrWords.length);
+    const native = !useOcr;
+    const rawItems = useOcr ? entry.ocrWords.map((w) => w.t) : (entry.textLayer ? entry.textLayer.items : null);
+    if (!rawItems || !rawItems.length) return;
+    // Jointure des items avec blancs APLATIS (exactement comme l'indexeur : join(' ')+replace(/\s+/g,' ')+trim),
+    // PLUS une table char→index d'item. Indispensable : PDF.js insère des items vides / des espaces (fins de
+    // ligne) ; sans aplatissement, `joined` aurait des doubles espaces là où le texte indexé n'en a qu'un →
+    // une expression à cheval sur une ligne, TROUVÉE par la recherche, ne serait PAS surlignée, et le nombre
+    // d'intervalles divergerait du `count` (désalignant la navigation ↑/↓).
+    let joined = '';
+    const itemAt = []; // itemAt[c] = index de l'item d'où provient le c-ième caractère de `joined`
+    let prevSpace = true;
+    for (let k = 0; k < rawItems.length; k++) {
+      const s = String(rawItems[k] == null ? '' : rawItems[k]);
+      for (let c = 0; c < s.length; c++) {
+        if (/\s/.test(s[c])) { if (!prevSpace) { joined += ' '; itemAt.push(k); prevSpace = true; } }
+        else { joined += s[c]; itemAt.push(k); prevSpace = false; }
+      }
+      if (k < rawItems.length - 1 && !prevSpace) { joined += ' '; itemAt.push(k); prevSpace = true; } // séparateur entre items
+    }
+    while (joined.endsWith(' ')) { joined = joined.slice(0, -1); itemAt.pop(); } // trim final
     const { norm, map } = buildNormIndex(joined);
     const intervals = findMatches(norm, map, pendingHL.normQuery, joined.length);
     if (!intervals.length) return;
-    const offs = []; let acc = 0;
-    for (const s of items) { offs.push(acc); acc += s.length + SEP.length; }
     const occ = clamp(pendingHL.occ || 0, 0, intervals.length - 1);
-    let currentDiv = null;
+
+    let scrollTarget = null;
+    const layer = native ? null : ensureOcrHlLayer(i, entry);
+    const ds = native ? 0 : (entry.dispScale || (entry.cssW && nativeSizes[i] ? entry.cssW / nativeSizes[i].w : 1));
     intervals.forEach((iv, idx) => {
-      for (let k = 0; k < items.length; k++) {
-        const s = offs[k], e = offs[k] + items[k].length;
-        if (e > iv.start && s < iv.end) {
-          const d = divs[k]; if (!d) continue;
+      const ks = new Set(); // index d'items couverts par cet intervalle
+      for (let pos = iv.start; pos < iv.end && pos < itemAt.length; pos++) ks.add(itemAt[pos]);
+      for (const k of ks) {
+        if (native) {
+          const d = entry.textLayer.divs[k]; if (!d) continue;
           d.classList.add('hl');
-          if (idx === occ) { d.classList.add('hl--current'); if (!currentDiv) currentDiv = d; }
+          if (idx === occ) { d.classList.add('hl--current'); if (!scrollTarget) scrollTarget = d; }
+        } else {
+          const wd = entry.ocrWords[k]; if (!wd || !layer) continue;
+          const box = el('div', { class: 'ocr-hl' + (idx === occ ? ' ocr-hl--current' : '') });
+          box.style.left = (wd.x * ds) + 'px'; box.style.top = (wd.y * ds) + 'px';
+          box.style.width = (wd.w * ds) + 'px'; box.style.height = (wd.h * ds) + 'px';
+          layer.appendChild(box);
+          if (idx === occ && !scrollTarget) scrollTarget = box;
         }
       }
     });
-    if (currentDiv) currentDiv.scrollIntoView({ block: 'center' });
+    // Ne centrer qu'au PREMIER affichage du résultat sélectionné. Le surlignage étant persistant,
+    // applyHighlight est rappelé à chaque re-rendu (virtualisation) : sans ce garde, revenir sur la
+    // page surlignée en défilant re-déclencherait scrollIntoView et détournerait le défilement.
+    if (scrollTarget && pendingHL && !pendingHL.scrolled) {
+      pendingHL.scrolled = true;
+      scrollTarget.scrollIntoView({ block: 'center' });
+    }
   }
 
   function highlightQuery(pageIndex, normQuery, occ = 0) {
+    // Efface un éventuel surlignage précédent (sur une autre page) avant d'en poser un nouveau.
+    clearHighlights();
     pendingHL = { pageIndex, normQuery, occ };
     scrollToPageInternal(pageIndex);
-    if (rendered.has(pageIndex) && rendered.get(pageIndex).textLayer) applyHighlight(pageIndex);
+    if (rendered.has(pageIndex)) applyHighlight(pageIndex);
     else updateVisible();
-    // Surlignage TEMPORAIRE : on l'efface après quelques secondes (aide à localiser le mot,
-    // puis disparaît pour ne pas gêner la lecture).
-    clearTimeout(hlTimeout);
-    hlTimeout = setTimeout(() => clearHighlights(), 6000);
+    // Surlignage PERSISTANT : il RESTE visible pendant la lecture (même en faisant défiler) pour
+    // repérer le mot dans une page dense. Il n'est effacé que volontairement — réouverture de la
+    // recherche ou saut de page (cf. clearHighlights() appelé par la vue lecteur).
   }
   function clearHighlights() {
     const p = pendingHL; pendingHL = null;
-    if (p) { const e = rendered.get(p.pageIndex); if (e && e.textLayer) e.textLayer.divs.forEach((d) => d && d.classList.remove('hl', 'hl--current')); }
+    if (!p) return;
+    const e = rendered.get(p.pageIndex);
+    if (!e) return;
+    if (e.textLayer) e.textLayer.divs.forEach((d) => d && d.classList.remove('hl', 'hl--current'));
+    removeOcrHlLayer(e);
   }
 
   // ---- Page entièrement censurée (réversible) ----

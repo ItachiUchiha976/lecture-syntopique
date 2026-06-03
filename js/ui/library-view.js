@@ -1,10 +1,13 @@
 // Vue Bibliothèque : grille des livres importés + flux d'import.
-import { el, formatBytes, formatDate, uuid, escapeHtml } from '../utils.js';
+import { el, formatBytes, formatDate, uuid, escapeHtml, debounce } from '../utils.js';
 import { toast, confirmDialog, promptDialog } from './dialogs.js';
 import { loadDocument, getDocInfo, renderThumbnail, destroyDoc } from '../pdf-engine.js';
 import * as store from '../storage.js';
 import { navigate } from '../router.js';
 import { indexAllPending } from '../text-indexer.js';
+import { ensureBookSearchable } from './ocr-gate.js';
+import { onOcrProgress, prepareReocr, ocrBook } from '../ocr.js';
+import { clearSearchCache } from '../search.js';
 import { buildBackup, restoreBackup, saveBlob } from '../backup.js';
 
 function progressOverlay(title) {
@@ -37,6 +40,7 @@ export async function renderLibrary() {
       const dlg = progressOverlay('Restauration…');
       try {
         const n = await restoreBackup(await f.text(), (d, t) => dlg.set(d, t));
+        clearSearchCache(); // les pages restaurées peuvent réutiliser un id existant → vider le cache
         dlg.close();
         await refresh();
         indexAllPending();
@@ -109,6 +113,18 @@ export async function renderLibrary() {
     const badges = el('div', { class: 'book-card__badges' });
     if (b.ocrStatus === 'running' || b.ocrStatus === 'pending')
       badges.appendChild(el('span', { class: 'badge badge--work', text: 'OCR…' }));
+    else if (b.ocrStatus === 'error')
+      badges.appendChild(el('span', { class: 'badge badge--err', title: 'La reconnaissance de texte a échoué — ce PDF s’ouvre mais la recherche n’y trouvera rien', text: '⚠️ OCR échouée' }));
+
+    const actions = [
+      el('button', { class: 'btn', text: 'Ouvrir', onClick: () => open(b) }),
+      el('button', { class: 'btn', text: 'Comparer', onClick: () => openCompare(b) }),
+      el('button', { class: 'btn', text: 'Renommer', onClick: () => rename(b) }),
+      el('button', { class: 'btn btn--danger', text: 'Suppr.', onClick: () => remove(b) }),
+    ];
+    // Livre dont l'OCR a échoué 3× → proposer de relancer la reconnaissance.
+    if (b.ocrStatus === 'error')
+      actions.splice(1, 0, el('button', { class: 'btn', text: 'Réessayer l’OCR', title: 'Relancer la reconnaissance de texte', onClick: () => retryOcr(b) }));
 
     return el('div', { class: 'book-card' }, [
       el('div', { class: 'book-card__thumb', onClick: () => open(b) }, [
@@ -121,16 +137,26 @@ export async function renderLibrary() {
         el('div', { class: 'book-card__meta', text: `${b.pageCount} page${b.pageCount > 1 ? 's' : ''} · ${formatBytes(b.byteSize)} · ${formatDate(b.importedAt)}` }),
         badges,
       ]),
-      el('div', { class: 'book-card__actions' }, [
-        el('button', { class: 'btn', text: 'Ouvrir', onClick: () => open(b) }),
-        el('button', { class: 'btn', text: 'Comparer', onClick: () => openCompare(b) }),
-        el('button', { class: 'btn', text: 'Renommer', onClick: () => rename(b) }),
-        el('button', { class: 'btn btn--danger', text: 'Suppr.', onClick: () => remove(b) }),
-      ]),
+      el('div', { class: 'book-card__actions' }, actions),
     ]);
   }
 
-  function open(b) { navigate('reader', { bookId: b.id }); }
+  // Relance l'OCR d'un livre en échec (remet le compteur à zéro + re-marque les pages à reconnaître).
+  async function retryOcr(b) {
+    try {
+      await store.updateBook(b.id, { ocrStatus: 'pending', ocrFailCount: 0 });
+      await prepareReocr(b);
+      ocrBook(b).catch((e) => console.warn('[ocr] retry', e)); // en fond ; le verrou bloquera à la prochaine ouverture
+      toast('OCR relancée en arrière-plan.');
+      refresh();
+    } catch (e) { toast('Impossible de relancer l’OCR : ' + (e.message || e), { type: 'error' }); }
+  }
+
+  // Ouvre un livre — mais SEULEMENT une fois cherchable (OCR précise terminée). Le verrou
+  // affiche un écran d'attente pour les PDF scannés ; les PDF natifs s'ouvrent aussitôt.
+  async function open(b) {
+    if (await ensureBookSearchable(b)) navigate('reader', { bookId: b.id });
+  }
 
   async function openCompare(book) {
     const others = (await store.getAllBooks()).filter((b) => b.id !== book.id);
@@ -138,7 +164,13 @@ export async function renderLibrary() {
     const overlay = el('div', { class: 'overlay' });
     const close = () => overlay.remove();
     const list = el('div', { class: 'compare-list' }, others.map((b) =>
-      el('button', { class: 'btn', text: b.title, onClick: () => { close(); navigate('dual', { leftBookId: book.id, rightBookId: b.id }); } })));
+      el('button', { class: 'btn', text: b.title, onClick: async () => {
+        close();
+        // Les DEUX livres doivent être cherchables avant la lecture double.
+        if (!(await ensureBookSearchable(book))) return;
+        if (!(await ensureBookSearchable(b))) return;
+        navigate('dual', { leftBookId: book.id, rightBookId: b.id });
+      } })));
     overlay.appendChild(el('div', { class: 'dialog' }, [
       el('h3', { text: `Comparer « ${book.title} » avec…` }),
       list,
@@ -162,6 +194,7 @@ export async function renderLibrary() {
     if (!ok) return;
     try {
       await store.deleteBook(b.id);
+      clearSearchCache(b.id); // purge l'entrée de cache de ce livre (anti-résultats périmés)
       toast('Livre supprimé.');
     } catch (e) {
       console.error('[delete]', e);
@@ -248,8 +281,14 @@ export async function renderLibrary() {
 
   await refresh();
   indexAllPending(); // indexation texte en fond des livres pas encore indexés
+  // Rafraîchit les badges (OCR…/échouée) quand une OCR de fond se termine ou échoue.
+  const refreshSoon = debounce(() => refresh(), 400);
+  const unsubOcr = onOcrProgress((e) => { if (e && (e.finished || e.failed)) refreshSoon(); });
   return {
     element,
-    destroy() { objectUrls.splice(0).forEach((u) => URL.revokeObjectURL(u)); },
+    destroy() {
+      try { unsubOcr(); } catch {}
+      objectUrls.splice(0).forEach((u) => URL.revokeObjectURL(u));
+    },
   };
 }

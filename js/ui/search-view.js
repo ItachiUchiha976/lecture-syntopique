@@ -31,6 +31,7 @@ export function createSearchView({ currentBookId, onGoto, openBookIds = null }) 
   let scope = 'book';                   // 'book' (sélectionné) | 'open' (2 ouverts) | 'all' (tous les importés)
   let results = [];
   let sel = -1;
+  let occInSel = 0;   // occurrence courante DANS la page-résultat sélectionnée (pour ↑/↓)
   let normQuery = '';
 
   const input = el('input', {
@@ -85,7 +86,7 @@ export function createSearchView({ currentBookId, onGoto, openBookIds = null }) 
     const res = await searchText(q, { scope, bookId: curBookId, openBookIds: openIds });
     normQuery = res.query;
     results = res.results;
-    sel = -1;
+    sel = -1; occInSel = 0;
     renderResults(res);
     // Indicateur OCR : si l'indexation/OCR tourne encore, prévenir que des résultats peuvent manquer.
     try {
@@ -118,21 +119,29 @@ export function createSearchView({ currentBookId, onGoto, openBookIds = null }) 
     });
   }
 
-  function select(idx) {
+  function goTo(idx, occ) {
     if (idx < 0 || idx >= results.length) return;
-    sel = idx;
+    sel = idx; occInSel = occ;
     [...list.children].forEach((c, i) => c.classList.toggle('search-item--active', i === idx));
     const r = results[idx];
-    onGoto({ bookId: r.bookId, pageIndex: r.pageIndex, normQuery, occ: 0 });
+    onGoto({ bookId: r.bookId, pageIndex: r.pageIndex, normQuery, occ });
+    const node = list.children[idx];
+    if (node) node.scrollIntoView({ block: 'nearest' });
   }
+  function select(idx) { goTo(idx, 0); }
+  // ↑/↓ : parcourt d'abord les occurrences DANS la page sélectionnée (le mot « courant » ambre se
+  // déplace), puis passe à la page-résultat suivante/précédente une fois la page épuisée.
   function step(dir) {
     if (!results.length) return;
+    if (sel < 0) { goTo(dir > 0 ? 0 : results.length - 1, 0); return; }
+    const count = Math.max(1, results[sel].count || 1);
+    const nextOcc = occInSel + dir;
+    if (nextOcc >= 0 && nextOcc < count) { goTo(sel, nextOcc); return; }
     let n = sel + dir;
     if (n < 0) n = results.length - 1;
     if (n >= results.length) n = 0;
-    select(n);
-    const node = list.children[n];
-    if (node) node.scrollIntoView({ block: 'nearest' });
+    const c2 = Math.max(1, results[n].count || 1);
+    goTo(n, dir > 0 ? 0 : c2 - 1);
   }
 
   function open() {

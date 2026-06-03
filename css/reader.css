@@ -32,6 +32,12 @@
   50% { background: rgba(245,166,35,1); box-shadow: 0 0 0 3px rgba(245,166,35,.45); }
 }
 
+/* Surlignage de recherche sur page SCANNÉE (image sans couche texte) : rectangles ambre posés
+   aux positions des mots reconnus par l'OCR. Au-dessus de l'image, sous l'overlay "page censurée". */
+.ocr-hl-layer { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 1; }
+.ocr-hl { position: absolute; background: rgba(245,166,35,.45); border-radius: 2px; }
+.ocr-hl--current { background: rgba(245,166,35,.9); animation: hl-pulse 0.9s ease-in-out 3; }
+
 .censor-layer { position: absolute; inset: 0; pointer-events: none; }
 
 /* Overlay "page entièrement censurée" (réversible via le bouton Rétablir) */

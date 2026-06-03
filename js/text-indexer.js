@@ -4,8 +4,12 @@ import * as store from './storage.js';
 import { loadDocument, destroyDoc } from './pdf-engine.js';
 import { buildNormIndex } from './text-normalize.js';
 import { countWords, hasRealText } from './word-counter.js';
+import { OCR_VERSION } from './ocr.js';
 
-const inProgress = new Set();   // bookIds en cours d'indexation (anti-doublon)
+// bookId -> Promise d'indexation en cours. Une MAP (et non un Set) pour qu'un appel concurrent
+// (p.ex. le verrou OCR qui fait `await indexBook`) ATTENDE réellement la fin de l'indexation de
+// fond déjà lancée, au lieu de rendre la main aussitôt avec un livre encore 'unknown'.
+const inProgress = new Map();
 let pendingRunning = false;
 const listeners = new Set();
 
@@ -45,7 +49,9 @@ async function indexWithDoc(book, pdfDoc) {
     let ocrApplied = false;
     if (!real) {
       const prev = await store.getPage(book.id, i - 1).catch(() => null);
-      if (prev && prev.ocrApplied && prev.text) { text = prev.text; ocrApplied = true; }
+      // On ne conserve l'OCR existant QUE s'il a été produit par la version COURANTE du moteur ;
+      // sinon la page redevient « à OCRiser » et sera re-traitée (OCR plus précise).
+      if (prev && prev.ocrApplied && prev.text && prev.ocrVersion === OCR_VERSION) { text = prev.text; ocrApplied = true; }
     }
     const usable = real || ocrApplied; // la page a-t-elle un texte exploitable pour la recherche ?
     if (usable) withText++; else needOcr++;
@@ -74,22 +80,28 @@ async function indexWithDoc(book, pdfDoc) {
   return updated;
 }
 
-// Indexe un livre (charge son propre document, le détruit ensuite). Garde anti-doublon.
-export async function indexBook(book, { force = false } = {}) {
-  if (!book) return book;
-  if (!force && isIndexed(book)) return book;
-  if (inProgress.has(book.id)) return book;
-  inProgress.add(book.id);
-  let pdfDoc = null;
-  try {
-    const bytes = await store.loadBinary(book.binaryRef);
-    if (!bytes) throw new Error('Binaire introuvable pour indexation');
-    pdfDoc = await loadDocument(bytes);
-    return await indexWithDoc(book, pdfDoc);
-  } finally {
-    if (pdfDoc) destroyDoc(pdfDoc);
-    inProgress.delete(book.id);
-  }
+// Indexe un livre (charge son propre document, le détruit ensuite). Garde anti-doublon : si une
+// indexation est DÉJÀ en cours pour ce livre, on renvoie SA promesse (afin que les appelants qui
+// `await` obtiennent le livre RÉELLEMENT indexé, pas une copie 'unknown' en cours de route).
+export function indexBook(book, { force = false } = {}) {
+  if (!book) return Promise.resolve(book);
+  if (!force && isIndexed(book)) return Promise.resolve(book);
+  const running = inProgress.get(book.id);
+  if (running) return running;
+  const p = (async () => {
+    let pdfDoc = null;
+    try {
+      const bytes = await store.loadBinary(book.binaryRef);
+      if (!bytes) throw new Error('Binaire introuvable pour indexation');
+      pdfDoc = await loadDocument(bytes);
+      return await indexWithDoc(book, pdfDoc);
+    } finally {
+      if (pdfDoc) destroyDoc(pdfDoc);
+      inProgress.delete(book.id);
+    }
+  })();
+  inProgress.set(book.id, p);
+  return p;
 }
 
 // Indexe tous les livres non indexés, un par un, en arrière-plan.

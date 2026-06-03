@@ -95,6 +95,7 @@ body {
 .badge { font-size: .68rem; padding: 2px 7px; border-radius: 999px; background: var(--bg-elev-2); color: var(--text-dim); }
 .badge--ok { background: rgba(34,197,94,.15); color: #86efac; }
 .badge--work { background: rgba(56,189,248,.15); color: #7dd3fc; }
+.badge--err { background: rgba(248,113,113,.16); color: #fca5a5; }
 .book-card__actions { display: flex; border-top: 1px solid var(--line); margin-top: auto; }
 .book-card__actions .btn { flex: 1; border: none; border-radius: 0; background: transparent; min-height: 40px; font-size: .82rem; }
 .book-card__actions .btn + .btn { border-left: 1px solid var(--line); }
@@ -141,6 +142,11 @@ body {
 /* ===== Barre de progression d'import / OCR ===== */
 .progress-line { height: 4px; background: var(--bg-elev-2); border-radius: 999px; overflow: hidden; }
 .progress-line > span { display: block; height: 100%; background: var(--accent); width: 0; transition: width .2s ease; }
+
+/* ===== Verrou OCR (écran d'attente bloquant avant ouverture d'un PDF scanné) ===== */
+.ocr-gate__intro { color: var(--text); line-height: 1.5; }
+.ocr-gate__pages { margin-top: 10px; font-size: .85rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.ocr-gate__eta { margin-top: 2px; font-size: .95rem; color: var(--accent); font-weight: 600; font-variant-numeric: tabular-nums; }
 
 /* ===== Spinner ===== */
 .spinner { width: 22px; height: 22px; border: 3px solid var(--bg-elev-2); border-top-color: var(--accent);

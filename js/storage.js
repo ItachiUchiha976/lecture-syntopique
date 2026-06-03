@@ -149,6 +149,7 @@ export async function getAllBooks() {
 }
 export async function deleteBook(id) {
   cancelledBooks.add(id); // stoppe toute OCR/indexation de fond AVANT de purger (anti pages fantômes)
+  try {
   const db = await getDB();
   const book = await db.get(STORES.books, id);
   // Pages
@@ -180,7 +181,11 @@ export async function deleteBook(id) {
   await blobsTx.done;
   await opfsRemoveBook(id);
   await db.delete(STORES.books, id);
-  cancelledBooks.delete(id); // purge terminée
+  } finally {
+    // Toujours retirer le marqueur, même si une étape a échoué (sinon l'id resterait « annulé »
+    // à vie → ce livre ne pourrait plus jamais être ré-indexé / OCRisé).
+    cancelledBooks.delete(id);
+  }
 }
 
 // ---------- Pages ----------
@@ -223,7 +228,6 @@ export async function deleteVoiceNote(bookId, noteId) {
 // ---------- Settings (avec valeurs par défaut) ----------
 const DEFAULT_SETTINGS = {
   wpm: 220,
-  coverageThreshold: 0.8,
   theme: 'dark',
   persistGranted: false,
   ocrLangs: 'eng+fra',

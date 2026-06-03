@@ -395,3 +395,78 @@ Test iPad : le clavier (p.X numérique, recherche) **s'ouvrait puis devenait int
   **Validé** en Node (2 correspondances « Bâton/bâton » pour la requête « baton », `<ici>` bien échappé).
 - `version.js` → **2026.06.03.13**. README + aide-mémoire déjà à jour pour la recherche. Reste à confirmer le clavier
   sur l'iPad réel (le comportement clavier iOS n'est pas reproductible en navigateur de bureau).
+
+---
+
+## 20. OCR précise bloquante + surlignage persistant (y c. scannés) + durcissement clavier (2026-06-03) — v2026.06.03.14
+
+Trois demandes après usage réel : (1) OCR plus précise ET **bloquer l'ouverture** d'un PDF scanné tant qu'elle n'est pas
+finie ; (2) **surlignage du mot persistant** (jusqu'à quitter la recherche) au lieu du pulse de 6 s ; (3) note clavier dans
+l'aide + tentative de correction. Tout **vérifié en navigateur réel** (Playwright, `test-newfeatures.cjs`, 0 erreur console).
+
+- **OCR plus précise** (`ocr.js`) : rendu **~250–300 DPI** (scale 2→3,5, cible 3000 px) au lieu de 2200 px ;
+  **prétraitement** niveaux de gris + étirement de contraste **par bandes** (tampon temporaire borné → pas de pic
+  mémoire iPad) ; `setParameters(user_defined_dpi:'300', preserve_interword_spaces:'1')`.
+- **Verrou OCR** (nouveau `js/ui/ocr-gate.js` + `library-view.js`, `reader-view.js`, `dual-view.js`) :
+  `ensureBookSearchable(book)` indexe si besoin, re-OCRise si la reconnaissance n'est pas à la version courante, puis
+  **écran de blocage** (`.ocr-gate`) avec barre + **temps restant estimé** (ETA = temps moyen/page × pages restantes) et
+  bouton « Retour à la bibliothèque » (l'OCR continue en fond). Les PDF **natifs** s'ouvrent sans attente. Le verrou est
+  posé À LA FOIS aux entrées bibliothèque (Ouvrir / Comparer / ⇄) ET dans `renderReader`/`renderDual` (couvre le
+  rechargement de l'app directement sur une route lecteur — sinon contourné).
+- **Re-traitement des anciens livres** : `OCR_VERSION` (= 2) gravé par page **et** par livre ; `prepareReocr()` re-marque
+  les pages scannées pas à la version courante (saute celles déjà à jour → reprise sûre). `pagesNeedingOcr` remis à 0 en
+  fin d'OCR (corrige un état qui aurait bloqué le verrou). `text-indexer.js` ne conserve l'OCR au ré-index que si
+  `ocrVersion` courant.
+- **Surlignage PERSISTANT** (`reader-pane.js`, `reader-view.js`, `dual-view.js`) : suppression du minuteur de 6 s ; le mot
+  reste surligné pendant la lecture (même en défilant) et n'est effacé qu'à la **réouverture de 🔍** ou au **saut de page**.
+  Garde anti-« scroll-hijack » : `scrollIntoView` seulement au 1ᵉʳ affichage (`pendingHL.scrolled`), sinon revenir sur la
+  page surlignée détournait le défilement à chaque re-rendu.
+- **Surlignage sur PDF SCANNÉS** (sans couche texte) : pendant l'OCR, on stocke la **position de chaque mot**
+  (`page.ocrWords`, unités PDF arrondies) ; `reader-pane.js` dessine un calque `.ocr-hl-layer` de rectangles ambre aux
+  positions des mots correspondants (même moteur de correspondance que le natif → requêtes multi-mots OK).
+- **Durcissement clavier** (`censor.js`) : `lostpointercapture` + filet `window` (pointerup/pointercancel, phase bulle)
+  qui resynchronisent l'état et relâchent toute capture « collée » sans préempter le commit d'un tracé. + note **« Si le
+  clavier ne s'affiche pas → fermer/rouvrir l'app »** et note **« OCR à l'ouverture »** dans l'aide-mémoire
+  (`welcome-tips.js`). NB : le clavier iOS reste non reproductible en navigateur de bureau (best-effort + note de repli).
+- **Revue multi-agents adversariale** : 6 bugs trouvés (verrou contourné au rechargement / pendant l'indexation de fond,
+  scroll-hijack, pic mémoire, reprise OCR, reset cosmétique) **tous corrigés**. `version.js` → **2026.06.03.14**.
+
+---
+
+## 21. Lot issu de 2 audits IA externes (Gemini + Claude) — v2026.06.03.15
+
+Après audit externe (dossier `G:\Mon Drive\Analyse App Syntopique\`), tri des avis (qui a raison, utilisateur vs IA) puis
+implémentation du lot P1+P2+P3 validé. **Conflits tranchés** : verrou OCR bloquant **conservé** (choix utilisateur) mais avec
+filet ; pinch-to-zoom **rejeté** (choix assumé) ; 2 modales d'accueil **conservées**. Tout **revérifié en navigateur réel**
+(`test-newfeatures.cjs`, 0 erreur console) + 3ᵉ revue multi-agents.
+
+- **OCR re-tentatives + jamais piégé** (`ocr.js`, `ui/ocr-gate.js`, `ui/library-view.js`) : `OCR_MAX_ATTEMPTS=3`.
+  `ocrBook` boucle via `runOcrPass` (reprise des pages restantes) ; après **3 échecs durs** → `ocrStatus:'error'` +
+  `ocrFailCount`, la lecture est **débloquée** (lecture seule), badge **« ⚠️ OCR échouée »** + bouton **« Réessayer l'OCR »**
+  dans la bibliothèque. La gate ne re-bloque jamais un livre 'error'.
+- **Recherche multi-mots sur scans corrigée** (`ocr.js`) : le texte OCR est **aplati** (`\s+`→espace) avant stockage — sinon
+  une expression coupée en fin de ligne était introuvable. `OCR_VERSION` → **3** (re-OCR des scans existants).
+- **Vrai hors-ligne** (`main.js : warmOfflineCache`) : pré-chargement one-shot (modules lazy + `vendor/` Tesseract/pdf-lib/
+  pdf.worker) pour que OCR/export marchent hors-ligne même sans usage en ligne préalable.
+- **Perf recherche** (`search.js`) : cache léger par livre (`{pageIndex,text,textNorm}` **sans** `ocrWords`) → plus de relecture
+  des grosses positions de mots à chaque frappe ; invalidé sur fin d'OCR/indexation.
+- **Robustesse** : re-test `cancelledBooks` **avant** `patchPage` (anti page-fantôme) ; `deleteBook` en `try/finally` ;
+  `db-schema.blocking()` ferme la connexion (anti-boot-figé) ; `router.js` sans `innerHTML` (XSS) ; PDF protégés → message clair ;
+  garde-fou mémoire à l'export volumineux ; prudence **CropBox/rotation** à l'export (image seule, anti-fuite).
+- **Confort** : navigation **occurrence par occurrence** (↑/↓ dans une page dense) ; ETA « Analyse de la 1ʳᵉ page… » ;
+  **Échap** ferme les modales d'accueil ; code mort retiré (`coverageThreshold`).
+- **Aide-mémoire** complété : fiche **« Sauvegarde automatique »** (auto-save + distinction Sauvegarder JSON / Exporter PDF) et
+  note **« OCR échouée 3× »**. `version.js` → **2026.06.03.15**.
+
+**Correctifs de la 3ᵉ revue multi-agents (sur ce lot) — v2026.06.03.16** (7 trouvailles confirmées, toutes corrigées) :
+- **Worker OCR partagé** (`ocr.js`) : entre 2 tentatives, on ne `terminate()` le worker Tesseract **que si aucune autre OCR
+  ne tourne** (`inProgress.size <= 1`) — sinon on corrompait silencieusement le livre OCRisé en parallèle.
+- **Recherche ↔ surlignage alignés** : (a) `reader-pane.applyHighlight` joint désormais les items en **aplatissant les blancs**
+  (comme l'indexeur) via une table char→item → une expression à cheval sur une fin de ligne, trouvée par la recherche, est bien
+  **surlignée** ; (b) pour les scans, `ocr.js` indexe la **même séquence de tokens** que le surlignage (`ocrWords.join(' ')`) →
+  le `count` de la recherche et les intervalles surlignés **coïncident** (navigation ↑/↓ par occurrence cohérente).
+- **Échap sur l'accueil** (`main.js`) : cible explicitement le bouton de fermeture (plus le 1ᵉʳ `.btn` qui était le lien
+  « Activer le rappel » → Échap ouvrait Google Agenda par erreur).
+- **Cache de recherche** (`search.js`/`library-view.js`) : invalidé à la **suppression** (`clearSearchCache(id)`) et à la
+  **restauration** (`clearSearchCache()`) → plus de résultats périmés après delete+restore d'un même livre.
+- `version.js` → **2026.06.03.16**.

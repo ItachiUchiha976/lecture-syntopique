@@ -68,9 +68,15 @@ Deux options gratuites, de la plus simple à la plus classique :
 - **Rechercher** (🔍, en lecture simple **et** double) : insensible à la **casse et aux accents** (« batons » trouve
   « Bâtons »…) et aux **ligatures** (« find » trouve « ﬁnd »). **Trois portées** : **Ce livre** (le PDF sélectionné),
   **Les 2 livres** (les deux PDF ouverts côte à côte — uniquement en lecture double), **Tous les livres** (tous les PDF
-  importés, ouverts ou non). Le mot trouvé est **surligné temporairement** dans la page. Si l'OCR d'un PDF scanné
-  n'est pas fini, un message le signale.
-- **OCR** : automatique à l'import pour les **PDF scannés** (anglais + français), pour rendre le texte cherchable.
+  importés, ouverts ou non). Quand tu touches un résultat, le mot est **surligné sur la page et le reste pendant ta
+  lecture** (même en faisant défiler) — il s'efface quand tu **rouvres la recherche 🔍** ou **changes de page**. Le
+  surlignage marche **aussi sur les PDF scannés** (positions des mots mémorisées par l'OCR). Les **↑/↓** parcourent les
+  occurrences d'une page puis passent à la page suivante.
+- **OCR** (anglais + français, **PDF scannés**) : reconnaissance de texte **précise** lancée à l'import. Pour qu'un PDF
+  scanné soit **cherchable**, son OCR doit être terminée **avant ouverture** : un écran d'attente affiche la progression
+  et le **temps restant estimé**, puis le livre s'ouvre tout seul (les PDF déjà numériques s'ouvrent sans attente). Si
+  l'OCR **échoue 3 fois**, le PDF s'ouvre quand même (en lecture, sans recherche) et porte un repère **« ⚠️ OCR échouée »**
+  dans la bibliothèque, avec un bouton **« Réessayer l'OCR »**.
 - **Exporter** : se débloque **quand tu as réellement lu tout le livre** (le temps de présence sur chaque page
   est mesuré ; scroller jusqu'à la fin ne suffit pas). Le PDF exporté est une **expurgation gravée** :
   - les **pages censurées** (bouton « Censurer la page ») sont **définitivement supprimées** ;

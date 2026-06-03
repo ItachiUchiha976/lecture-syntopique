@@ -307,10 +307,40 @@ export function createCensorLayer({ wrap, cssW, cssH, nativeW, nativeH, getTool,
     redraw();
   }
 
+  // FILET DE SÉCURITÉ « clavier » (iPad/Safari). Une capture de pointeur restée « collée »
+  // (stylet ou doigt) empoisonne l'activation transitoire iOS : le focus() suivant (recherche /
+  // saut de page) réussit mais iOS SUPPRIME le clavier logiciel. Les chemins normaux (onUp/onCancel)
+  // relâchent déjà la capture ; ces deux garde-fous couvrent les cas où l'évènement de fin n'arrive
+  // jamais sur le canvas (geste interrompu, multi-touch, capture perdue) → on resynchronise l'état
+  // pour qu'aucune capture ni aucun verrou de défilement ne survive au geste.
+  function onLostCapture(e) {
+    if (penId !== null && e.pointerId === penId) {
+      if (drawing) { drawing = false; previewRect = null; points = []; if (onDrawingChange) onDrawingChange(false); redraw(); }
+      penId = null;
+    }
+    if (panId !== null && e.pointerId === panId) { panning = false; panId = null; }
+  }
+  // En phase de BULLE (après onUp/onCancel du canvas) : n'agit que si l'état est ENCORE actif,
+  // c.-à-d. si l'évènement de fin n'a pas été traité sur le canvas (sinon penId/panId sont déjà nuls).
+  function onWindowPointerEnd(e) {
+    if (penId !== null && e.pointerId === penId) {
+      try { canvas.releasePointerCapture(e.pointerId); } catch {}
+      if (drawing) { drawing = false; previewRect = null; points = []; if (onDrawingChange) onDrawingChange(false); redraw(); }
+      penId = null;
+    }
+    if (panId !== null && e.pointerId === panId) {
+      try { canvas.releasePointerCapture(e.pointerId); } catch {}
+      panning = false; panId = null;
+    }
+  }
+
   canvas.addEventListener('pointerdown', onDown);
   canvas.addEventListener('pointermove', onMove);
   canvas.addEventListener('pointerup', onUp);
   canvas.addEventListener('pointercancel', onCancel);
+  canvas.addEventListener('lostpointercapture', onLostCapture);
+  window.addEventListener('pointerup', onWindowPointerEnd);
+  window.addEventListener('pointercancel', onWindowPointerEnd);
 
   redraw();
 
@@ -328,6 +358,9 @@ export function createCensorLayer({ wrap, cssW, cssH, nativeW, nativeH, getTool,
       canvas.removeEventListener('pointermove', onMove);
       canvas.removeEventListener('pointerup', onUp);
       canvas.removeEventListener('pointercancel', onCancel);
+      canvas.removeEventListener('lostpointercapture', onLostCapture);
+      window.removeEventListener('pointerup', onWindowPointerEnd);
+      window.removeEventListener('pointercancel', onWindowPointerEnd);
       canvas.remove();
     },
   };

@@ -23,7 +23,10 @@ async function show(name, params) {
     console.error('[router] rendu échoué', e);
     const div = document.createElement('div');
     div.className = 'empty-state';
-    div.innerHTML = '<h2>Erreur</h2><p>' + (e && e.message ? e.message : 'Vue indisponible') + '</p>';
+    // Pas d'innerHTML avec e.message (qui peut contenir du HTML) : on passe par des nœuds texte.
+    const h = document.createElement('h2'); h.textContent = 'Erreur';
+    const p = document.createElement('p'); p.textContent = (e && e.message) ? e.message : 'Vue indisponible';
+    div.append(h, p);
     root.appendChild(div);
     current = { name, params, view: null };
     return;
