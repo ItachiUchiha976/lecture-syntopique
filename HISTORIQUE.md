@@ -325,5 +325,26 @@ Demandes de l'utilisateur après usage réel sur iPad. `version.js` → **2026.0
 - **Aide-mémoire** (`welcome-tips.js`) mis à jour (plus de « Vérifier » ni de « 80 % »).
 - **Validation.** `node --check` sur tous les fichiers ; **tests d'intégration en Chrome headless via CDP** sur
   `sample.pdf` (numérique) + `scanned.pdf` (scanné) : suppression de page, rasterisation+masque, **texte réinjecté
-  extractible** (natif + OCR injecté + **ré-OCR** = 17 mots positionnés), tous **PASS**. Reste à confirmer sur iPad réel
-  le décalage du tracé (bug visual-viewport éventuel) et le confort du bord droit.
+  extractible** (natif + OCR injecté + **ré-OCR** = 17 mots positionnés), tous **PASS**.
+
+---
+
+## 17. Correctif coordonnées de tracé — vraie cause racine (2026-06-03, nuit) — v2026.06.03.10
+
+Test sur iPad réel après le lot §16 : deux bugs de tracé subsistaient — (1) **bord droit inactif** au surligneur/censure
+sur la **1ʳᵉ page** en mode simple (pages suivantes OK) ; (2) **tout le tracé décalé à GAUCHE** partout en lecture double.
+
+- **Cause racine unique (enfin identifiée) : décalage buffer↔affichage du canvas de censure.** La couche était
+  dimensionnée `style.width = cssW px`, mais `reset.css` impose `canvas { max-width: 100% }`. Quand la largeur de page
+  (`cssW`) change **après** la création du canvas — course de mise en page au tout 1ᵉʳ rendu (page 0), et stabilisation
+  des colonnes flex en lecture double — le **buffer** (`canvas.width`) reste plus large que l'**affichage**. L'ancien
+  `localPt = clientX − getBoundingClientRect().left` supposait buffer = affichage → tracé **compressé vers la gauche** et
+  **bord droit inatteignable**. (La formule était « juste » seulement dans ce cas d'égalité — d'où l'analyse précédente.)
+- **Fix (`censor.js`)** : la couche **remplit** le wrap (`style.width/height: 100%`, comme `.page-canvas`) ; `localPt`
+  travaille en **px buffer** et met à l'échelle par `canvas.width / rect.width` (et hauteur) ; `dispScale = canvas.width/nativeW`.
+  → Le tracé tombe **toujours** sous la pointe, quel que soit l'écart buffer↔affichage, dans les deux sens.
+- **Validation** : test de coordonnées en Chrome headless/CDP — pointeur simulé sur une couche **buffer 600 / affichage 300**
+  (facteur ×2) → rect PDF exactement sous la pointe ; **et** cas 1:1 → inchangé (aucune régression). **PASS**.
+- L'hypothèse « pinch-zoom / visual viewport » est **écartée**. Le fix `computeBaseW` (padding réel) + gouttière 28 px
+  du §16 restent utiles (anti-débordement / anti-gestes) mais étaient **secondaires** : la vraie cause était le buffer↔affichage.
+- `version.js` → **2026.06.03.10**.

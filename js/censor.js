@@ -49,15 +49,21 @@ function nearPolyline(p, pts, tol) {
 export function createCensorLayer({ wrap, cssW, cssH, nativeW, nativeH, getTool, initialMarks, onCommit, onDrawingChange }) {
   const dpr = 1; // basse résolution : aplats/traits n'ont pas besoin du Retina → ÷4 mémoire canvas (iPad)
   const canvas = el('canvas', { class: 'censor-layer' });
-  canvas.style.width = cssW + 'px';
-  canvas.style.height = cssH + 'px';
+  // La couche REMPLIT le wrap (comme .page-canvas) : sa taille AFFICHÉE suit TOUJOURS la page, même si la
+  // largeur de page (cssW) change APRÈS la création du canvas — course de mise en page au 1ᵉʳ rendu, et
+  // colonnes flex en lecture double. Le buffer reste dimensionné en cssW ; localPt() reconvertit via
+  // canvas.width / getBoundingClientRect().width, donc le tracé tombe TOUJOURS sous la pointe quel que soit
+  // l'écart buffer↔affichage. Corrige : bord droit « mort » sur la 1ʳᵉ page (mode simple) et tracé décalé à
+  // gauche en lecture double (constatés sur iPad). En cas d'égalité buffer=affichage, comportement inchangé.
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
   canvas.width = Math.max(1, Math.round(cssW * dpr));
   canvas.height = Math.max(1, Math.round(cssH * dpr));
   wrap.appendChild(canvas);
   const ctx = canvas.getContext('2d');
   const scroller = wrap.closest('.pages-scroller'); // pour le défilement au doigt (touch-action:none)
 
-  const dispScale = cssW / nativeW;             // CSS px par unité PDF
+  const dispScale = canvas.width / nativeW;     // px BUFFER du canvas par unité PDF (≠ CSS si l'affichage est redimensionné)
   const toCss = (u) => u * dispScale;
   const toPdf = (px) => px / dispScale;
 
@@ -113,7 +119,7 @@ export function createCensorLayer({ wrap, cssW, cssH, nativeW, nativeH, getTool,
 
   function redraw() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, cssW, cssH);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = FILL;
     for (const m of marks) drawMark(m);
     if (drawing) {
@@ -130,10 +136,14 @@ export function createCensorLayer({ wrap, cssW, cssH, nativeW, nativeH, getTool,
   }
 
   // ---- Interaction ----
-  // getBoundingClientRect + clientX/Y (et NON e.offsetX/Y, peu fiable sous capture sur Safari).
+  // Coordonnées en px BUFFER du canvas. getBoundingClientRect + clientX/Y (et NON e.offsetX/Y, peu fiable sous
+  // capture sur Safari). Mise à l'échelle par canvas.width / rect.width : si la couche est AFFICHÉE plus étroite
+  // (ou plus large) que son buffer, le tracé reste exactement sous la pointe (corrige le décalage iPad).
   function localPt(e) {
     const r = canvas.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top };
+    const sx = r.width ? canvas.width / r.width : 1;
+    const sy = r.height ? canvas.height / r.height : 1;
+    return { x: (e.clientX - r.left) * sx, y: (e.clientY - r.top) * sy };
   }
 
   function rectFrom(a, b) {
