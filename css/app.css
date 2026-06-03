@@ -163,6 +163,7 @@ body {
 .chip { padding: 6px 12px; min-height: 36px; border-radius: 999px; font-size: .85rem; }
 .chip[aria-pressed="true"] { background: var(--accent); color: #1a1206; border-color: transparent; }
 .search-count { color: var(--text-dim); font-size: .82rem; }
+.search-ocr-note { color: var(--accent-2); font-size: .82rem; line-height: 1.35; padding: 2px 2px 4px; }
 .search-results { overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 6px; }
 .search-item { text-align: left; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
 .search-item--active { border-color: var(--accent); }
@@ -220,11 +221,14 @@ body {
 .welcome-hide input { width: 18px; height: 18px; }
 
 /* ===== Aide-mémoire d'utilisation (2e carte d'accueil) ===== */
-.usage-card { width: min(480px, 100%); }
+.usage-card { width: min(480px, 100%); display: flex; flex-direction: column; max-height: 86vh; }
+.usage-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; margin: 4px -6px 0; padding: 0 6px; }
 .usage-item { display: flex; gap: 12px; align-items: flex-start; margin: 12px 0; }
 .usage-item__icon { font-size: 1.3rem; flex: 0 0 auto; line-height: 1.4; }
 .usage-item__title { font-weight: 700; color: var(--text); }
 .usage-item__desc { color: var(--text-dim); font-size: .88rem; line-height: 1.4; margin-top: 2px; }
+.usage-tools { margin: 4px 0 0; padding-left: 18px; }
+.usage-tools li { margin: 3px 0; }
 
 /* ===== Pause posture (recadrage du dos) ===== */
 .posture-card { width: min(480px, 100%); }

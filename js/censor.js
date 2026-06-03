@@ -1,17 +1,35 @@
 // Couche de censure d'UNE page : canvas superposé où l'on dessine les masques.
-// Outils : rectangle, lasso (forme libre), surligneur de texte, gomme.
-// La censure est RÉSERVÉE AU STYLET (Apple Pencil) via Pointer Events ; le doigt,
-// lui, sert UNIQUEMENT à faire défiler la page. Pendant un tracé au stylet, le
-// défilement est verrouillé (onDrawingChange) : la paume posée ne fait pas bouger
-// la page sous le dessin (palm rejection).
-// Les formes sont stockées en UNITÉS PDF (origine haut-gauche, points PDF),
-// indépendamment du zoom / de la résolution d'affichage.
+// Outils : rectangle, lasso (forme libre), surligneur (marqueur bleu), gomme.
+//
+// La censure est RÉSERVÉE AU STYLET (Apple Pencil) via Pointer Events ; le DOIGT
+// sert UNIQUEMENT à faire défiler (et, en mode gomme, à effacer une censure d'un tap).
+// La couche active est en `touch-action: none` (indispensable pour que le stylet
+// DESSINE au lieu de scroller sur iPad) ; le défilement au doigt est donc géré
+// manuellement ici, AVEC inertie (momentum) au lever pour rester confortable.
+//
+// Robustesse multi-touch : on suit l'identité des pointeurs (penId / panId). Le stylet
+// a TOUJOURS la priorité ; si un doigt/une paume a commencé un défilement avant le
+// stylet, on l'abandonne proprement (plus de tracé « transformé en scroll », plus de
+// censure parasite au lever de la paume). Pendant un tracé stylet, tout doigt est ignoré.
+//
+// Mémoire : la couche est rendue en DPR 1 (des aplats/traits n'ont pas besoin du Retina)
+// → ÷4 sur son empreinte canvas (important en lecture double + zoom sur iPad).
+//
+// Les formes sont stockées en UNITÉS PDF (origine haut-gauche), indépendamment du
+// zoom / de la résolution d'affichage.
 import { el, uuid } from './utils.js';
 import { simplifyPath, tracePath, pointInPolygon } from './stroke-smoothing.js';
 
 const FILL = 'rgba(11, 18, 32, 0.95)';        // censure validée (quasi noir opaque)
 const PREVIEW = 'rgba(11, 18, 32, 0.55)';     // aperçu pendant le tracé
 const MARKER_CSS_W = 18;                       // épaisseur du surligneur "marqueur" (px CSS)
+const MARKER_COLOR = 'rgba(37, 99, 235, 0.32)';   // surligneur BLEU translucide (texte visible, ≠ censure noire)
+const MARKER_PREVIEW = 'rgba(37, 99, 235, 0.22)';
+
+// Réglages de l'inertie (momentum) du défilement au doigt.
+const FLICK_MIN_V = 0.05;   // px/ms : en-dessous, pas de relance (simple dépose)
+const STOP_V      = 0.02;   // px/ms : on stoppe l'animation sous ce seuil
+const FRICTION    = 0.95;   // décroissance par 16,67 ms (~60 fps)
 
 // Distance d'un point à un segment, et à une polyligne (pour effacer un trait de marqueur).
 function distToSeg(px, py, ax, ay, bx, by) {
@@ -28,8 +46,8 @@ function nearPolyline(p, pts, tol) {
   return false;
 }
 
-export function createCensorLayer({ wrap, cssW, cssH, nativeW, nativeH, getTextDivs, getTool, initialMarks, onCommit, onDrawingChange }) {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+export function createCensorLayer({ wrap, cssW, cssH, nativeW, nativeH, getTool, initialMarks, onCommit, onDrawingChange }) {
+  const dpr = 1; // basse résolution : aplats/traits n'ont pas besoin du Retina → ÷4 mémoire canvas (iPad)
   const canvas = el('canvas', { class: 'censor-layer' });
   canvas.style.width = cssW + 'px';
   canvas.style.height = cssH + 'px';
@@ -45,29 +63,30 @@ export function createCensorLayer({ wrap, cssW, cssH, nativeW, nativeH, getTextD
 
   let marks = (initialMarks || []).slice();
 
-  // État de dessin
+  // État de dessin (stylet)
   let drawing = false;
+  let penId = null;                              // pointerId du stylet/souris qui dessine
   let startPt = null;
   let points = [];                              // points CSS du tracé en cours
-  let touched = new Set();                      // indices de spans touchés (surligneur)
   let previewRect = null;                       // rect CSS en cours
-  // Défilement au doigt : la couche active est en touch-action:none (pour que le STYLET
-  // dessine au lieu de scroller) ; on gère donc le défilement du doigt nous-mêmes.
+
+  // État de défilement au doigt (touch-action:none → géré manuellement, avec inertie)
   let panning = false;
+  let panId = null;                              // pointerId du doigt qui fait défiler
   let panMoved = false;                          // le doigt a-t-il bougé (scroll) ou est-ce un simple tap ?
   let panStartY = 0, panStartX = 0, panTop = 0, panLeft = 0;
+  // Suivi de vitesse pour l'inertie
+  let panLastT = 0, panLastX = 0, panLastY = 0;
+  let panVX = 0, panVY = 0;                      // vitesse du doigt (px/ms)
+  let momentumRAF = 0;
 
-  function divRectCss(idx) {
-    const d = getTextDivs()[idx];
-    if (!d) return null;
-    return { x: d.offsetLeft, y: d.offsetTop, w: d.offsetWidth, h: d.offsetHeight };
-  }
+  const nowMs = (e) => (e && e.timeStamp) || performance.now();
 
   // Trace une polyligne épaisse (marqueur), couleur = fillStyle courant (FILL ou PREVIEW).
-  function strokePath(ptsCss, widthCss) {
+  function strokePath(ptsCss, widthCss, color) {
     if (!ptsCss.length) return;
     ctx.save();
-    ctx.strokeStyle = ctx.fillStyle;
+    ctx.strokeStyle = color || ctx.fillStyle;
     ctx.lineWidth = widthCss; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     ctx.beginPath();
     ctx.moveTo(ptsCss[0].x, ptsCss[0].y);
@@ -83,7 +102,7 @@ export function createCensorLayer({ wrap, cssW, cssH, nativeW, nativeH, getTextD
     } else if (m.type === 'highlight') { // ancien surligneur (quads) — compat. ascendante
       for (const q of m.quads) ctx.fillRect(toCss(q.x), toCss(q.y), toCss(q.w), toCss(q.h));
     } else if (m.type === 'marker' && m.path && m.path.length) {
-      strokePath(m.path.map((p) => ({ x: toCss(p.x), y: toCss(p.y) })), toCss(m.width || 0) || MARKER_CSS_W);
+      strokePath(m.path.map((p) => ({ x: toCss(p.x), y: toCss(p.y) })), toCss(m.width || 0) || MARKER_CSS_W, MARKER_COLOR);
     } else if (m.type === 'lasso' && m.path && m.path.length > 1) {
       ctx.beginPath();
       tracePath(ctx, m.path.map((p) => ({ x: toCss(p.x), y: toCss(p.y) })));
@@ -105,15 +124,13 @@ export function createCensorLayer({ wrap, cssW, cssH, nativeW, nativeH, getTextD
       } else if (tool === 'lasso' && points.length) {
         ctx.beginPath(); tracePath(ctx, points); ctx.closePath(); ctx.fill();
       } else if (tool === 'highlight' && points.length) {
-        strokePath(points, MARKER_CSS_W);
+        strokePath(points, MARKER_CSS_W, MARKER_PREVIEW);
       }
     }
   }
 
   // ---- Interaction ----
-  // On utilise getBoundingClientRect + clientX/Y (et NON e.offsetX/Y) : sur Safari, offsetX
-  // devient peu fiable quand le pointeur est capturé (relatif à l'écran) → la censure
-  // « ratait » le côté droit d'une page centrée et le surligneur ne trouvait pas le texte.
+  // getBoundingClientRect + clientX/Y (et NON e.offsetX/Y, peu fiable sous capture sur Safari).
   function localPt(e) {
     const r = canvas.getBoundingClientRect();
     return { x: e.clientX - r.left, y: e.clientY - r.top };
@@ -121,17 +138,6 @@ export function createCensorLayer({ wrap, cssW, cssH, nativeW, nativeH, getTextD
 
   function rectFrom(a, b) {
     return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(a.x - b.x), h: Math.abs(a.y - b.y) };
-  }
-
-  function addTouchedAt(p) {
-    const divs = getTextDivs();
-    for (let i = 0; i < divs.length; i++) {
-      const d = divs[i];
-      if (p.x >= d.offsetLeft && p.x <= d.offsetLeft + d.offsetWidth &&
-          p.y >= d.offsetTop && p.y <= d.offsetTop + d.offsetHeight) {
-        touched.add(i);
-      }
-    }
   }
 
   function eraseAt(p) {
@@ -156,56 +162,100 @@ export function createCensorLayer({ wrap, cssW, cssH, nativeW, nativeH, getTextD
 
   function commit() { redraw(); onCommit(marks.slice()); }
 
+  // ---- Inertie du défilement au doigt ----
+  function cancelMomentum() { if (momentumRAF) { cancelAnimationFrame(momentumRAF); momentumRAF = 0; } }
+  function startMomentum() {
+    cancelMomentum();
+    if (!scroller) return;
+    if (Math.abs(panVX) < FLICK_MIN_V && Math.abs(panVY) < FLICK_MIN_V) return; // dépose, pas un flick
+    let last = performance.now();
+    const step = (t) => {
+      const dt = t - last; last = t;
+      const decay = Math.pow(FRICTION, dt / 16.67);
+      panVX *= decay; panVY *= decay;
+      if (Math.abs(panVX) < STOP_V && Math.abs(panVY) < STOP_V) { momentumRAF = 0; return; }
+      const beforeTop = scroller.scrollTop, beforeLeft = scroller.scrollLeft;
+      // Le contenu défile à l'opposé du doigt : d(scrollTop)/dt = -vitesseDoigtY.
+      scroller.scrollTop  -= panVY * dt;
+      scroller.scrollLeft -= panVX * dt;
+      if (scroller.scrollTop === beforeTop && scroller.scrollLeft === beforeLeft) { momentumRAF = 0; return; } // butée
+      momentumRAF = requestAnimationFrame(step);
+    };
+    momentumRAF = requestAnimationFrame(step);
+  }
+
+  // ---- Pointer Events ----
   function onDown(e) {
     const tool = getTool();
     if (!tool || tool === 'none' || tool === 'pan') return;
-    // La censure est réservée au STYLET (Apple Pencil) et à la souris (tests PC).
-    // Le DOIGT (pointerType 'touch') ne dessine jamais : il sert à faire défiler.
-    // Comme la couche est en touch-action:none (indispensable pour que le stylet dessine
-    // au lieu de scroller sur iPad), on gère le défilement au doigt manuellement ici.
+    cancelMomentum(); // tout nouveau contact stoppe l'inertie en cours (on peut "rattraper" un fling)
+
     if (e.pointerType === 'touch') {
-      if (drawing) return;                       // palm rejection : un tracé stylet est en cours
+      // Le DOIGT ne dessine jamais : il fait défiler.
+      if (drawing) return;            // palm rejection : un tracé stylet est en cours
+      if (panId !== null) return;     // un doigt gère déjà le défilement (multi-doigts ignorés)
       if (!scroller) return;
-      panning = true; panMoved = false;
+      panId = e.pointerId; panning = true; panMoved = false;
       panStartY = e.clientY; panStartX = e.clientX;
       panTop = scroller.scrollTop; panLeft = scroller.scrollLeft;
+      panLastT = nowMs(e); panLastX = e.clientX; panLastY = e.clientY;
+      panVX = panVY = 0;
       try { canvas.setPointerCapture(e.pointerId); } catch {}
       return;
     }
+
+    // Stylet / souris : prend la main sur le dessin. Si un doigt/une paume avait
+    // commencé un défilement, on l'abandonne pour ne pas le confondre avec le tracé.
+    if (panning) { try { canvas.releasePointerCapture(panId); } catch {} panning = false; panId = null; }
+    penId = e.pointerId;
     e.preventDefault();
     try { canvas.setPointerCapture(e.pointerId); } catch {}
     const p = localPt(e);
-    if (tool === 'erase') { eraseAt(p); return; }
-    drawing = true; startPt = p; points = [p]; touched = new Set(); previewRect = null;
+    if (tool === 'erase') { eraseAt(p); penId = null; return; }
+    drawing = true; startPt = p; points = [p]; previewRect = null;
     if (onDrawingChange) onDrawingChange(true); // verrouille le scroll pendant le tracé (palm rejection)
     redraw();
   }
+
   function onMove(e) {
-    if (panning) {
+    // Défilement au doigt : SEUL le doigt qui a initié le pan.
+    if (panning && e.pointerId === panId) {
+      const t = nowMs(e), dt = t - panLastT;
+      if (dt > 0) {
+        // vitesse instantanée lissée (passe-bas) pour une inertie stable
+        const ivx = (e.clientX - panLastX) / dt;
+        const ivy = (e.clientY - panLastY) / dt;
+        const a = 0.7;
+        panVX = a * ivx + (1 - a) * panVX;
+        panVY = a * ivy + (1 - a) * panVY;
+        panLastT = t; panLastX = e.clientX; panLastY = e.clientY;
+      }
       const dx = e.clientX - panStartX, dy = e.clientY - panStartY;
       if (!panMoved && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) panMoved = true;
       if (scroller) { scroller.scrollTop = panTop - dy; scroller.scrollLeft = panLeft - dx; }
       return;
     }
-    if (!drawing) return;
+    // Tracé : SEUL le pointeur stylet qui dessine.
+    if (!drawing || e.pointerId !== penId) return;
     e.preventDefault();
     const tool = getTool();
     const p = localPt(e);
     if (tool === 'rect') previewRect = rectFrom(startPt, p);
-    else if (tool === 'lasso') points.push(p);
-    else if (tool === 'highlight') points.push(p);
+    else if (tool === 'lasso' || tool === 'highlight') points.push(p);
     redraw();
   }
+
   function onUp(e) {
-    if (panning) {
-      panning = false;
+    if (panning && e.pointerId === panId) {
+      panning = false; panId = null;
       try { canvas.releasePointerCapture(e.pointerId); } catch {}
       // Tap du doigt (sans glisser) en mode gomme = effacer LA censure touchée (pas toutes).
-      if (!panMoved && getTool() === 'erase') eraseAt(localPt(e));
+      if (!panMoved && getTool() === 'erase') { eraseAt(localPt(e)); return; }
+      if (panMoved) startMomentum(); // relance l'inertie sur un vrai glissé
       return;
     }
-    if (!drawing) return;
-    drawing = false;
+    if (!drawing || e.pointerId !== penId) return;
+    drawing = false; penId = null;
     if (onDrawingChange) onDrawingChange(false);
     const tool = getTool();
     const p = localPt(e);
@@ -221,10 +271,19 @@ export function createCensorLayer({ wrap, cssW, cssH, nativeW, nativeH, getTextD
       if (simp.length >= 2) marks.push({ id: uuid(), type: 'marker',
         path: simp.map((q) => ({ x: toPdf(q.x), y: toPdf(q.y) })), width: toPdf(MARKER_CSS_W) });
     }
-    previewRect = null; points = []; touched = new Set();
+    previewRect = null; points = [];
     commit();
   }
-  function onCancel() { panning = false; drawing = false; if (onDrawingChange) onDrawingChange(false); previewRect = null; points = []; touched = new Set(); redraw(); }
+
+  function onCancel(e) {
+    if (!e || e.pointerId === panId) { panning = false; panId = null; cancelMomentum(); }
+    if (!e || e.pointerId === penId) {
+      drawing = false; penId = null;
+      if (onDrawingChange) onDrawingChange(false);
+      previewRect = null; points = [];
+    }
+    redraw();
+  }
 
   canvas.addEventListener('pointerdown', onDown);
   canvas.addEventListener('pointermove', onMove);
@@ -240,7 +299,9 @@ export function createCensorLayer({ wrap, cssW, cssH, nativeW, nativeH, getTextD
     setMarks: (m) => { marks = (m || []).slice(); redraw(); },
     undo: () => { if (marks.length) { marks.pop(); commit(); return true; } return false; },
     clear: () => { if (marks.length) { marks = []; commit(); } },
+    isDrawing: () => drawing,   // utile pour différer une mise à jour SW pendant un tracé
     destroy() {
+      cancelMomentum();
       canvas.removeEventListener('pointerdown', onDown);
       canvas.removeEventListener('pointermove', onMove);
       canvas.removeEventListener('pointerup', onUp);

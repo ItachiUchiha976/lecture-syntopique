@@ -34,6 +34,12 @@ async function getWorker(langs) {
   })();
   return workerPromise;
 }
+// Libère le worker Tesseract (langues eng+fra = plusieurs Mo) quand plus aucun OCR n'est en cours.
+async function terminateWorker() {
+  if (!workerPromise) return;
+  const p = workerPromise; workerPromise = null;
+  try { const w = await p; await w.terminate(); } catch {}
+}
 
 const inProgress = new Set();
 const listeners = new Set();
@@ -58,6 +64,9 @@ export async function ocrBook(book, { langs = 'eng+fra' } = {}) {
 
     let done = 0;
     for (const idx of need) {
+      // Le livre a-t-il été supprimé pendant l'OCR ? Signal synchrone → on arrête net
+      // (sinon patchPage recréerait des pages « fantômes » pour un livre qui n'existe plus).
+      if (store.cancelledBooks.has(book.id)) break;
       const page = await pdfDoc.getPage(idx + 1);
       const vp1 = page.getViewport({ scale: 1 });
       // ~ bonne résolution pour l'OCR sans exploser la mémoire (une page à la fois)
@@ -88,6 +97,7 @@ export async function ocrBook(book, { langs = 'eng+fra' } = {}) {
   } finally {
     if (pdfDoc) destroyDoc(pdfDoc);
     inProgress.delete(book.id);
+    if (inProgress.size === 0) terminateWorker(); // plus aucun OCR en cours → on libère la mémoire du worker
   }
 }
 

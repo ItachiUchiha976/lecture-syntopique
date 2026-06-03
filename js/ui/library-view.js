@@ -1,5 +1,5 @@
 // Vue Bibliothèque : grille des livres importés + flux d'import.
-import { el, formatBytes, formatDate, uuid } from '../utils.js';
+import { el, formatBytes, formatDate, uuid, escapeHtml } from '../utils.js';
 import { toast, confirmDialog, promptDialog } from './dialogs.js';
 import { loadDocument, getDocInfo, renderThumbnail, destroyDoc } from '../pdf-engine.js';
 import * as store from '../storage.js';
@@ -50,6 +50,13 @@ export async function renderLibrary() {
     onClick: async () => {
       const books = await store.getAllBooks();
       if (!books.length) { toast('Aucun livre à sauvegarder.'); return; }
+      const totalBytes = books.reduce((s, b) => s + (b.byteSize || 0), 0);
+      if (totalBytes > 150 * 1024 * 1024) {
+        const go = await confirmDialog({ title: 'Grosse sauvegarde',
+          message: `Ta bibliothèque pèse ~${formatBytes(totalBytes)}. La sauvegarde charge tout en mémoire : sur iPad, ça peut être lent voire saturer la mémoire.\nContinuer quand même ?`,
+          okText: 'Continuer', cancelText: 'Annuler' });
+        if (!go) return;
+      }
       const dlg = progressOverlay('Sauvegarde…');
       try {
         const json = await buildBackup((d, t) => dlg.set(d, t));
@@ -149,7 +156,7 @@ export async function renderLibrary() {
   async function remove(b) {
     const ok = await confirmDialog({
       title: 'Supprimer ce livre ?',
-      message: `« ${b.title} » et toutes ses annotations seront définitivement supprimés de l’app.`,
+      message: `« ${escapeHtml(b.title)} » et toutes ses annotations seront définitivement supprimés de l’app.`,
       okText: 'Supprimer', danger: true,
     });
     if (!ok) return;

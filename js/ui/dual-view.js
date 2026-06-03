@@ -13,17 +13,41 @@ import { getSetting, getAllBooks, getProgress } from '../storage.js';
 import { indexBook, isIndexed } from '../text-indexer.js';
 import { createReadingTracker } from '../reading-tracker.js';
 import { createVoiceNotes } from './voice-notes.js';
+import { createSearchView } from './search-view.js';
+import { runExportFlow } from './export-flow.js';
 
 export async function renderDual({ leftBookId, rightBookId }) {
   const left = await openBookDoc(leftBookId);
   const right = await openBookDoc(rightBookId);
   for (const b of [left.book, right.book]) if (!isIndexed(b)) indexBook(b).catch(() => {});
 
-  const trackerL = createReadingTracker({ book: left.book });
-  const trackerR = createReadingTracker({ book: right.book });
+  const trackerL = createReadingTracker({ book: left.book, onProgress: () => { if (focused === 'L') updateExportBtn(); } });
+  const trackerR = createReadingTracker({ book: right.book, onProgress: () => { if (focused === 'R') updateExportBtn(); } });
 
-  const paneL = createReaderPane({ book: left.book, pdfDoc: left.pdfDoc, dual: true, onActivePage: (i) => { trackerL.setActivePage(i); if (focused === 'L') updateDualPageLabel(); } });
-  const paneR = createReaderPane({ book: right.book, pdfDoc: right.pdfDoc, dual: true, onActivePage: (i) => { trackerR.setActivePage(i); if (focused === 'R') updateDualPageLabel(); } });
+  const autoPromptedL = new Set(), autoPromptedR = new Set();
+  let tL = 0, tR = 0;
+  const paneL = createReaderPane({ book: left.book, pdfDoc: left.pdfDoc, dual: true,
+    onActivePage: (i) => { trackerL.setActivePage(i); if (focused === 'L') updateDualPageLabel(); },
+    onMarksChange: (i, marks) => { clearTimeout(tL); tL = setTimeout(() => autoVerify(paneL, left.book, autoPromptedL, i, marks), 700); } });
+  const paneR = createReaderPane({ book: right.book, pdfDoc: right.pdfDoc, dual: true,
+    onActivePage: (i) => { trackerR.setActivePage(i); if (focused === 'R') updateDualPageLabel(); },
+    onMarksChange: (i, marks) => { clearTimeout(tR); tR = setTimeout(() => autoVerify(paneR, right.book, autoPromptedR, i, marks), 700); } });
+
+  // Proposition automatique de censurer toute la page au-delà du seuil (par panneau).
+  async function autoVerify(pane, book, set, i, marks) {
+    if (pane.isPageCensored(i)) return;
+    const size = pane.getNativeSize(i);
+    if (!size || !marks || !marks.length) return;
+    const cov = computeCoverage(marks, size.w, size.h);
+    if (cov >= 0.995) { pane.setPageCensored(i, true); toast(`Page ${i + 1} entièrement censurée.`); return; }
+    const threshold = await getSetting('coverageThreshold');
+    if (cov > threshold && !set.has(i)) {
+      set.add(i);
+      const ok = await confirmDialog({ title: `Page ${i + 1} censurée à ${Math.round(cov * 100)} %`,
+        message: `Plus de ${Math.round(threshold * 100)} % masqué. Censurer toute la page ? (réversible)`, okText: 'Oui', cancelText: 'Non' });
+      if (ok) pane.setPageCensored(i, true);
+    }
+  }
 
   // ---- Aller à une page (panneau focalisé) ----
   function updateDualPageLabel() {
@@ -45,6 +69,7 @@ export async function renderDual({ leftBookId, rightBookId }) {
   let focused = 'L';
   const activePane = () => (focused === 'L' ? paneL : paneR);
   const activeBook = () => (focused === 'L' ? left.book : right.book);
+  const activeTracker = () => (focused === 'L' ? trackerL : trackerR);
   function setFocus(f) {
     focused = f;
     paneL.element.classList.toggle('reader--focus', f === 'L');
@@ -54,6 +79,8 @@ export async function renderDual({ leftBookId, rightBookId }) {
     // Les notes vocales listées suivent le livre focalisé.
     if (voice && voice.isOpen()) voice.refresh();
     updateDualPageLabel();
+    if (search) search.setCurrentBook(activeBook().id); // la recherche « ce livre » suit le panneau actif
+    updateExportBtn();
   }
   paneL.element.addEventListener('pointerdown', () => setFocus('L'), true);
   paneR.element.addEventListener('pointerdown', () => setFocus('R'), true);
@@ -108,6 +135,32 @@ export async function renderDual({ leftBookId, rightBookId }) {
   });
   toolbar.rightSlot.append(voice.button);
 
+  // ---- Export du livre focalisé (débloqué quand CE livre est réellement lu) ----
+  const exportBtn = el('button', { class: 'btn', text: 'Exporter', disabled: '', onClick: () => onExportDual() });
+  function updateExportBtn() {
+    const ready = activeTracker().bookRead;
+    exportBtn.disabled = !ready;
+    exportBtn.classList.toggle('btn--primary', ready);
+    exportBtn.title = ready ? `Exporter le PDF filtré (${activeBook().title})` : 'Termine la lecture de ce livre (panneau actif) pour l’exporter';
+  }
+  async function onExportDual() {
+    if (!activeTracker().bookRead) { toast('Termine d’abord la lecture de ce livre (panneau actif) pour débloquer l’export.'); return; }
+    await runExportFlow({ book: activeBook() });
+  }
+  toolbar.rightSlot.append(exportBtn);
+
+  // ---- Recherche (dans le livre focalisé ; le résultat va au bon panneau) ----
+  const search = createSearchView({
+    currentBookId: left.book.id,
+    onGoto: ({ bookId: bid, pageIndex, normQuery, occ }) => {
+      if (bid === left.book.id) { search.close(); setFocus('L'); paneL.highlightQuery(pageIndex, normQuery, occ); }
+      else if (bid === right.book.id) { search.close(); setFocus('R'); paneR.highlightQuery(pageIndex, normQuery, occ); }
+      else navigate('reader', { bookId: bid, gotoPage: pageIndex, highlightQuery: normQuery });
+    },
+  });
+  const searchBtn = el('button', { class: 'btn btn-icon', html: '🔍', title: 'Rechercher (panneau actif)',
+    onClick: () => (search.isOpen() ? search.close() : search.open()) });
+
   // ---- Échange rapide d'un des deux livres (comparer un livre-ancre contre plusieurs sources) ----
   async function pickBook(title, onPick) {
     const others = (await getAllBooks()).filter((b) => b.id !== left.book.id && b.id !== right.book.id);
@@ -136,6 +189,7 @@ export async function renderDual({ leftBookId, rightBookId }) {
     el('span', { class: 'title', html: '▦ Lecture double' }),
     el('span', { class: 'spacer' }),
     gotoBtn,
+    searchBtn,
   ]);
 
   const dual = el('div', { class: 'dual' }, [
@@ -143,7 +197,7 @@ export async function renderDual({ leftBookId, rightBookId }) {
     el('div', { class: 'dual-col' }, [el('div', { class: 'dual-col__head' }, [titleR, swapR]), paneR.element]),
   ]);
 
-  const element = el('div', { class: 'view' }, [header, toolbar.element, dual, voice.panel]);
+  const element = el('div', { class: 'view' }, [header, toolbar.element, dual, voice.panel, search.element]);
   setFocus('L');
 
   await trackerL.init();
@@ -161,6 +215,8 @@ export async function renderDual({ leftBookId, rightBookId }) {
     destroy() {
       try { trackerL.destroy(); } catch {}
       try { trackerR.destroy(); } catch {}
+      try { voice.destroy(); } catch {}
+      try { search.destroy(); } catch {}
       try { toolbar.destroy(); } catch {}
       try { paneL.destroy(); } catch {}
       try { paneR.destroy(); } catch {}

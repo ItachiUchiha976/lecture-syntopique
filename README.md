@@ -48,10 +48,12 @@ Deux options gratuites, de la plus simple à la plus classique :
   Touche l'indicateur **p.X** (en haut à droite) pour **aller directement à une page** (en simple **et** en double).
 - **Comparer (lecture double)** : « Comparer » sur un livre → choisis le second → les deux s'affichent côte à côte.
   Le bouton **⇄** en haut de chaque colonne permet de **remplacer** un des deux PDF par un autre sans quitter la
-  comparaison (pratique pour confronter un livre-ancre à plusieurs sources, l'une après l'autre).
-- **Censurer** (Apple Pencil uniquement ; le doigt fait défiler), 3 outils + gomme dans la barre d'outils :
-  - **▭ Rectangle**, **◌ Forme libre (lasso)**, **🖊️ Surligneur (marqueur : trait épais au stylet)**, **⌫ Gomme**, **↶ Annuler**.
-  - **Effacer une censure précise** : prends la **⌫ gomme** et **tape la censure du doigt** (seule celle-là est retirée).
+  comparaison. La **recherche 🔍** et l'**export** sont aussi disponibles en lecture double (ils agissent sur le
+  panneau actif). Le défilement au doigt a une **inertie** ; le stylet dessine, même près du bord.
+- **Censurer / surligner** (Apple Pencil ; le doigt fait défiler), dans la barre d'outils :
+  - **Censurer (cacher)** : **▭ Rectangle** ou **◌ Forme libre (lasso)** — masque **noir**.
+  - **Surligner (mettre en avant sans cacher)** : **🖊️ Surligneur** — trait **bleu translucide**, le texte reste lisible.
+  - **⌫ Gomme** et **↶ Annuler**. **Effacer une censure précise** : prends la **⌫ gomme** et **tape la censure du doigt** (seule celle-là est retirée).
   - **« Vérifier la censure »** : si la page est couverte à **> 80 %**, l'app propose de la **censurer entièrement** ;
     à 100 %, elle est marquée automatiquement. Tu peux **Rétablir** une page censurée à tout moment.
 - **Connexions vocales** (🎤) : enregistre à voix haute les liens que tu découvres entre les documents.
@@ -60,8 +62,9 @@ Deux options gratuites, de la plus simple à la plus classique :
   **⤴ partager** (feuille de partage iOS → Google Drive, Fichiers, ou une IA comme Claude/Gemini), **🗑 supprimer**.
   Bouton **⤓ Tout exporter** pour partager toutes les notes d'un livre d'un coup. *(Le micro doit être autorisé
   dans Safari à la 1ʳᵉ utilisation. iOS enregistre en .m4a, lu partout — pas de mp3 natif.)*
-- **Rechercher** (🔍) : insensible à la **casse et aux accents** (« batons » trouve « Bâtons », « BATONS »…).
-  Filtre **Ce livre** / **Tous les livres**. Résultats surlignés, navigation ↑ / ↓.
+- **Rechercher** (🔍, en lecture simple **et** double) : insensible à la **casse et aux accents** (« batons » trouve
+  « Bâtons »…) et aux **ligatures** (« find » trouve « ﬁnd »). Filtre **Ce livre** / **Tous les livres** ; le mot
+  trouvé est **surligné temporairement** dans la page. Si l'OCR d'un PDF scanné n'est pas fini, un message le signale.
 - **OCR** : automatique à l'import pour les **PDF scannés** (anglais + français), pour rendre le texte cherchable.
 - **Exporter** : se débloque **quand tu as réellement lu tout le livre** (le temps de présence sur chaque page
   est mesuré ; scroller jusqu'à la fin ne suffit pas). À l'export : avertissement, puis **choix** de

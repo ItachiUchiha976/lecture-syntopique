@@ -47,27 +47,31 @@ export async function buildBackup(onProgress) {
 export async function restoreBackup(text, onProgress) {
   const data = JSON.parse(text);
   if (!data || data.format !== 'syntopique-backup') throw new Error('Fichier de sauvegarde non reconnu.');
-  let done = 0;
+  let done = 0, ok = 0;
   const total = (data.books || []).length;
   for (const entry of data.books || []) {
-    const b = entry.meta;
-    if (entry.pdfB64) b.binaryRef = await store.saveBinary(`${b.id}/original.pdf`, b64ToBytes(entry.pdfB64), 'application/pdf');
-    b.thumbnailRef = entry.thumbB64 ? await store.saveBinary(`${b.id}/thumb.jpg`, b64ToBytes(entry.thumbB64), 'image/jpeg') : null;
-    await store.addBook(b);
-    for (const p of entry.pages || []) await store.putPage(p);
-    if (entry.progress) await store.putProgress(entry.progress);
-    // Notes vocales (backup version 2). Absentes des sauvegardes v1 → boucle vide, sans erreur.
-    for (const n of entry.voiceNotes || []) {
-      const { audioB64, ...meta } = n;
-      const ext = meta.ext || 'm4a';
-      const mime = meta.mime || 'audio/mp4';
-      const audioRef = audioB64 ? await store.saveBinary(`${b.id}/voice/${meta.noteId}.${ext}`, b64ToBytes(audioB64), mime) : null;
-      await store.saveVoiceNote({ ...meta, bookId: b.id, audioRef });
-    }
+    // Chaque livre est isolé : si l'un échoue, on n'interrompt PAS toute la restauration.
+    try {
+      const b = entry.meta;
+      if (entry.pdfB64) b.binaryRef = await store.saveBinary(`${b.id}/original.pdf`, b64ToBytes(entry.pdfB64), 'application/pdf');
+      b.thumbnailRef = entry.thumbB64 ? await store.saveBinary(`${b.id}/thumb.jpg`, b64ToBytes(entry.thumbB64), 'image/jpeg') : null;
+      await store.addBook(b);
+      for (const p of entry.pages || []) await store.putPage(p);
+      if (entry.progress) await store.putProgress(entry.progress);
+      // Notes vocales (backup version 2). Absentes des sauvegardes v1 → boucle vide, sans erreur.
+      for (const n of entry.voiceNotes || []) {
+        const { audioB64, ...meta } = n;
+        const ext = meta.ext || 'm4a';
+        const mime = meta.mime || 'audio/mp4';
+        const audioRef = audioB64 ? await store.saveBinary(`${b.id}/voice/${meta.noteId}.${ext}`, b64ToBytes(audioB64), mime) : null;
+        await store.saveVoiceNote({ ...meta, bookId: b.id, audioRef });
+      }
+      ok++;
+    } catch (e) { console.warn('[restore] livre ignoré (erreur)', e); }
     done++; if (onProgress) onProgress(done, total);
   }
-  if (data.settings) for (const k of Object.keys(data.settings)) await store.setSetting(k, data.settings[k]);
-  return total;
+  if (data.settings) for (const k of Object.keys(data.settings)) { try { await store.setSetting(k, data.settings[k]); } catch {} }
+  return ok;
 }
 
 export async function saveBlob(bytesOrString, filename, mime) {

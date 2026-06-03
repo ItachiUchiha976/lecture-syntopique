@@ -6,7 +6,7 @@
   flex: 1; min-height: 0; overflow: auto; -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   background: #0b1220;
-  padding: 16px 0 calc(16px + var(--safe-bottom));
+  padding: 16px max(16px, env(safe-area-inset-right)) calc(16px + var(--safe-bottom)) max(16px, env(safe-area-inset-left));
   scroll-behavior: auto;
 }
 
@@ -64,6 +64,19 @@
 .dual-swap { width: 34px; height: 34px; min-height: 34px; flex: 0 0 auto; font-size: 1rem; }
 .dual-col__head .spacer { flex: 1; }
 .dual-col .reader { flex: 1; min-height: 0; }
+/* Marges anti-bords en lecture double : iOS réserve ~20 px le long des bords PHYSIQUES de
+   l'écran pour ses gestes système → sans marge, le 1er contact du stylet près du bord est
+   intercepté (« non censurable »). On ne marge que les bords qui touchent l'écran. */
+@media (orientation: landscape) {
+  .dual-col:first-child .pages-scroller { padding-left:  max(24px, env(safe-area-inset-left)); }
+  .dual-col:last-child  .pages-scroller { padding-right: max(24px, env(safe-area-inset-right)); }
+}
+@media (orientation: portrait) {
+  .dual .pages-scroller {
+    padding-left:  max(24px, env(safe-area-inset-left));
+    padding-right: max(24px, env(safe-area-inset-right));
+  }
+}
 .reader--focus { box-shadow: inset 0 0 0 2px var(--accent); }
 @media (orientation: portrait) {
   .dual { flex-direction: column; }

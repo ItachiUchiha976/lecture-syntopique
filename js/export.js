@@ -31,7 +31,7 @@ function drawMarksCanvas(ctx, marks, scale) {
       for (const q of m.quads) ctx.fillRect(q.x * scale, q.y * scale, q.w * scale, q.h * scale);
     } else if (m.type === 'marker' && m.path && m.path.length) {
       ctx.save();
-      ctx.strokeStyle = '#000'; ctx.lineWidth = (m.width || 0) * scale; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.strokeStyle = 'rgba(37, 99, 235, 0.32)'; ctx.lineWidth = (m.width || 0) * scale; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
       ctx.beginPath();
       ctx.moveTo(m.path[0].x * scale, m.path[0].y * scale);
       for (let k = 1; k < m.path.length; k++) ctx.lineTo(m.path[k].x * scale, m.path[k].y * scale);
@@ -59,10 +59,12 @@ function drawMarksLight(PDFLib, page, marks) {
     } else if (m.type === 'highlight') {
       for (const q of m.quads) page.drawRectangle({ x: q.x, y: H - q.y - q.h, width: q.w, height: q.h, color: black });
     } else if (m.type === 'marker' && m.path && m.path.length > 1) {
+      // Surligneur d'emphase : bleu translucide (texte visible) — pas une censure.
       const w = m.width || 6;
+      const blue = rgb(0.145, 0.388, 0.922);
       const cap = PDFLib.LineCapStyle ? PDFLib.LineCapStyle.Round : undefined;
       for (let k = 0; k < m.path.length - 1; k++) {
-        page.drawLine({ start: { x: m.path[k].x, y: H - m.path[k].y }, end: { x: m.path[k + 1].x, y: H - m.path[k + 1].y }, thickness: w, color: black, lineCap: cap });
+        page.drawLine({ start: { x: m.path[k].x, y: H - m.path[k].y }, end: { x: m.path[k + 1].x, y: H - m.path[k + 1].y }, thickness: w, color: blue, opacity: 0.32, lineCap: cap });
       }
     } else if (m.type === 'lasso' && m.path && m.path.length > 2) {
       // drawSvgPath : origine en haut-gauche, y vers le bas -> nos coordonnées conviennent.

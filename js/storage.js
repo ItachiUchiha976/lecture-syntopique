@@ -3,6 +3,10 @@
 // vivent réellement les octets.
 import { getDB, STORES } from './db-schema.js';
 
+// Livres en cours de suppression : signal SYNCHRONE (sans fenêtre de course ni relecture base)
+// pour que l'OCR/indexation de fond s'arrête net et ne RECRÉE pas de pages orphelines via patchPage.
+export const cancelledBooks = new Set();
+
 // ---------- Persistance du stockage (anti-éviction 7 jours) ----------
 export async function requestPersistence() {
   try {
@@ -101,15 +105,16 @@ export async function loadBinary(ref) {
   return new Uint8Array(await rec.blob.arrayBuffer());
 }
 
-export async function loadBinaryBlob(ref) {
+export async function loadBinaryBlob(ref, mime) {
   if (!ref) return null;
   if (ref.kind === 'idb') {
     const db = await getDB();
     const rec = await db.get(STORES.blobs, ref.key);
     return rec ? rec.blob : null;
   }
+  // OPFS : on porte le type MIME demandé (un Blob sans type n'est pas lisible par <audio> sur iOS).
   const u8 = await loadBinary(ref);
-  return u8 ? new Blob([u8]) : null;
+  return u8 ? new Blob([u8], mime ? { type: mime } : undefined) : null;
 }
 
 async function deleteBinary(ref) {
@@ -143,6 +148,7 @@ export async function getAllBooks() {
   return all.sort((a, b) => (b.importedAt || 0) - (a.importedAt || 0));
 }
 export async function deleteBook(id) {
+  cancelledBooks.add(id); // stoppe toute OCR/indexation de fond AVANT de purger (anti pages fantômes)
   const db = await getDB();
   const book = await db.get(STORES.books, id);
   // Pages
@@ -174,6 +180,7 @@ export async function deleteBook(id) {
   await blobsTx.done;
   await opfsRemoveBook(id);
   await db.delete(STORES.books, id);
+  cancelledBooks.delete(id); // purge terminée
 }
 
 // ---------- Pages ----------

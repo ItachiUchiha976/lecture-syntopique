@@ -27,7 +27,7 @@ export function createReaderPane({ book, pdfDoc, dual = false, onActivePage = nu
   let hlTimeout = 0;    // surlignage de recherche TEMPORAIRE (s'efface tout seul)
   let scrollLock = null; // {top,left} figés pendant un tracé au stylet (palm rejection)
   let tool = 'none';    // outil de censure actif
-  const MIN_ZOOM = 0.5, MAX_ZOOM = 3;
+  const MIN_ZOOM = 0.35, MAX_ZOOM = 3; // 0.35 → permet de réduire pour voir la page entière
   let zoom = 1;         // facteur de zoom utilisateur (1 = page ajustée à la largeur)
   let baseW = 800;      // largeur "ajustée à la largeur" du conteneur, avant zoom
   const censoredPages = new Set(); // pages marquées "entièrement censurées"
@@ -262,12 +262,15 @@ export function createReaderPane({ book, pdfDoc, dual = false, onActivePage = nu
     const { items, divs } = entry.textLayer;
     divs.forEach((d) => d && d.classList.remove('hl', 'hl--current'));
     if (!pendingHL || pendingHL.pageIndex !== i || !pendingHL.normQuery) return;
-    const joined = items.join('');
+    // Même séparateur que l'indexeur (text-indexer joint les items avec UNE espace) : sinon
+    // une requête multi-mots (« palais mémoire ») figure dans la liste mais ne se surligne pas.
+    const SEP = ' ';
+    const joined = items.join(SEP);
     const { norm, map } = buildNormIndex(joined);
     const intervals = findMatches(norm, map, pendingHL.normQuery, joined.length);
     if (!intervals.length) return;
     const offs = []; let acc = 0;
-    for (const s of items) { offs.push(acc); acc += s.length; }
+    for (const s of items) { offs.push(acc); acc += s.length + SEP.length; }
     const occ = clamp(pendingHL.occ || 0, 0, intervals.length - 1);
     let currentDiv = null;
     intervals.forEach((iv, idx) => {

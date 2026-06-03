@@ -215,6 +215,83 @@ l'utilisation et `Guide d'installation.pdf` pour la mise en ligne et l'installat
 - **Aide-mémoire & README enrichis.** Les 3 nouveautés (reprise de lecture, saut de page simple+double, surligneur
   marqueur, effacer au doigt) sont documentées dans la carte d'aide-mémoire à l'ouverture (`welcome-tips.js`) et le
   README. `version.js` → **2026.06.03.3**.
+
+## 11. Lot de corrections (2026-06-03, soir)
+
+- **Notes vocales injouables (#5).** Les fichiers OPFS étaient relus en `Blob` **sans type MIME** → `<audio>` iOS
+  refusait. `voice-notes.js` : on recrée le Blob avec `n.mime` (`audio/mp4`) + `audio.play()` explicite + contrôles.
+- **Surligneur bleu translucide (#4).** Le `marker` n'est plus noir-censure : couleur **bleue ~0.32** (texte visible),
+  **exclu du calcul de couverture** (`coverage.js`) — c'est une emphase, pas une censure — et rendu **bleu translucide
+  à l'export** (raster + `drawLine` `opacity`). `censor.js` `strokePath(color)`, `toolbar`/aide-mémoire mis à jour.
+- **Seuil 80 % automatique (#1).** `reader-view.js` + `dual-view.js` : sur `onMarksChange` (débounce 700 ms), si la
+  couverture dépasse le seuil → **proposition auto** de censurer toute la page (≥99,5 % = auto) ; 1×/page (`autoPrompted`).
+- **Dézoom élargi (#2).** `MIN_ZOOM` 0.5 → **0.35** (voir la page entière).
+- **Côté droit du panneau droit en double (#3).** Coordonnées déjà robustes (`getBoundingClientRect`) ; ajout d'une
+  **marge latérale** en mode double (`reader.css`) pour éloigner le contenu des bords d'écran (gestes iOS). À confirmer
+  sur iPad — signalé pour l'analyse externe.
+- `version.js` → **2026.06.03.4**.
+
+## 12. Correctifs issus des analyses externes (3 IA) — 2026-06-03
+
+- **A1 — Course multi-touch stylet/doigt (`censor.js`, réécrit).** On route le tracé/scroll par `pointerId`
+  (`penId`/`panId`) : le stylet a toujours la priorité, une paume posée avant ne détourne plus le tracé et ne
+  laisse plus de censure parasite au lever ; pendant un tracé stylet, tout doigt est ignoré. **+ inertie**
+  (momentum lissé, friction, arrêt aux butées) pour le défilement au doigt (qui était « sec » sans le momentum
+  natif quand un outil est actif). **+ DPR 1** sur la couche (÷4 mémoire). Code mort retiré ; `isDrawing()` exposé.
+- **A2 — Bord droit non censurable (`reader.css`).** iOS réserve ~20 px le long des bords physiques (gestes
+  système). Marges **≥ 24 px** sur les bords qui touchent l'écran (paysage : extérieur des colonnes ; portrait :
+  les deux ; lecture simple : 16 px latéraux), via `env(safe-area-inset-*)`.
+- **A3 — Surlignage de recherche multi-mots (`reader-pane.js`).** `applyHighlight` joignait les items SANS espace
+  alors que l'index les joint AVEC espace → les expressions ne se surlignaient pas. Aligné sur le même séparateur.
+- **A4 — `loadBinaryBlob` porte le MIME (`storage.js`).** Évite les Blob OPFS sans type (injouables en `<audio>` iOS).
+- **E1 — XSS via titre PDF (`library-view.js`).** `escapeHtml(b.title)` dans le message de suppression (rendu en `innerHTML`).
+- **Perf (`ocr.js`).** Worker Tesseract **libéré** (`terminate`) quand plus aucun OCR en cours (langues = plusieurs Mo).
+- **Course OCR/suppression (`ocr.js`, `text-indexer.js`).** Garde `if (!await getBook(id)) break/return` dans les
+  boucles → plus de **pages fantômes** si on supprime un livre pendant son indexation/OCR.
+- **Service Worker (`main.js`).** Rechargement **uniquement pour une vraie mise à jour** (`updatePending`, plus de
+  reload parasite au 1er chargement dû à `clients.claim`) **et uniquement quand l'app est en arrière-plan** (ne coupe
+  plus une censure / un enregistrement).
+- **Restauration robuste (`backup.js`).** Chaque livre isolé en `try/catch` (un échec n'interrompt plus tout) ;
+  retourne le nb réellement restauré. **+ avertissement** avant une grosse sauvegarde (> 150 Mo).
+- **Lecture double enrichie (`dual-view.js`, `search-view.js`).** Ajout de la **recherche** (livre focalisé, va au
+  bon panneau ; `search-view` accepte un livre courant modifiable) **et de l'export** (bouton « Exporter » du livre
+  focalisé, débloqué quand ce livre est lu). Fuite corrigée : `voice`/`search` détruits proprement.
+- *Reporté (volontaire) :* CSP (risque de casser WASM/worker hors-ligne — la faille E1 est déjà corrigée),
+  allocation paresseuse des canvas, index de recherche inversé, busy()/SW affiné.
+- `version.js` → **2026.06.03.5**.
+
+## 13. Confort quotidien (points reportés les plus utiles) — 2026-06-03
+
+- **Indicateur OCR dans la recherche (`search-view.js`).** Quand l'indexation/OCR du/des livre(s) concerné(s) tourne
+  encore, une note s'affiche sous la barre : « 🔄 Indexation/OCR en cours — certains résultats peuvent encore manquer ».
+  Fini le « Aucun résultat » trompeur sur un scanné fraîchement importé.
+- **« Pages restantes » pour l'export (`reader-view.js`).** Le bouton Exporter désactivé indique désormais le nombre
+  approximatif de pages encore à lire (au lieu d'un simple « termine la lecture »).
+- **Conseil stylet (`toolbar.js`).** À la 1ʳᵉ sélection d'un outil de censure (par session), un toast rappelle :
+  « Dessine avec l'Apple Pencil ; le doigt fait défiler ; gomme = tape une censure du doigt ».
+- *Toujours reporté (faible bénéfice / risque) :* CSP, allocation paresseuse des canvas, index inversé.
+- `version.js` → **2026.06.03.6**.
+
+## 14. Comparaison avec une 4ᵉ implémentation externe — 2026-06-03
+
+Comparé notre app à une version « entièrement corrigée » par une 4ᵉ IA (dossier `Quatrième analyse/`). Sa base
+= notre dump v.4 + les correctifs des analyses (A1/A2/A3/E1, course OCR, SW, Tesseract) — donc un **sous-ensemble**
+de notre app actuelle (il lui manque DPR÷4, recherche+export en double, indicateur OCR, pages restantes, conseil
+stylet, avertissement grosse sauvegarde, restauration par-livre). **Un seul point repris** car réellement meilleur :
+sa garde anti pages-fantômes utilise un **`Set` synchrone `cancelledBooks`** (posé par `deleteBook`, lu dans les
+boucles OCR/indexation) — plus propre que mon `await getBook()` (pas de relecture base par page, pas de fenêtre de
+course). Adopté dans `storage.js` / `ocr.js` / `text-indexer.js`. Son garde-fou SW via `busy()`/`__setBusy` a été
+**considéré mais non repris** : notre approche (reload seulement sur vraie MAJ ET en arrière-plan) évite aussi la
+perte de données ET tout rechargement-surprise en pleine lecture. `version.js` → **2026.06.03.7**.
+
+## 15. Doc & aide-mémoire à jour — 2026-06-03
+
+- **README + Guide PDF régénérés** pour refléter l'app actuelle (surligneur bleu d'emphase, gomme au doigt,
+  recherche + export en lecture double, reprise dernière page, saut de page, indicateur OCR, pause posture).
+- **Aide-mémoire d'accueil (`welcome-tips.js`)** : rubrique **« Les outils de la barre »** ajoutée (chaque outil
+  expliqué : ✋ ▭ ◌ 🖊️ ⌫ ↶ zoom, Vérifier, 🎤 🔍 p.X ⇄ Exporter), contenu actualisé, et la carte est désormais
+  **défilante** (`.usage-scroll`, `max-height: 86vh`) — en-tête et bouton « Compris » restent visibles.
+- `version.js` → **2026.06.03.8**.
 - **Doc & version.** README + ce guide mis à jour ; correction « doigt ou Pencil » → **Apple Pencil uniquement** ;
   `version.js` → **2026.06.02.3**. App **publiée en ligne** sur GitHub Pages (cf. [[deploiement-en-ligne]] côté mémoire).
   Syntaxe ES vérifiée (`node --check`) + service HTTP local OK. Reste à valider sur iPad réel : micro `.m4a`,

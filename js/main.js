@@ -12,16 +12,26 @@ function registerSW() {
   // La version dans l'URL = source unique de vérité (cf. version.js / sw.js).
   swc.register(`sw.js?v=${APP_VERSION}`).then((reg) => {
     // Si un nouveau SW prend le contrôle (nouvelle version), on recharge une fois.
-    let refreshing = false;
+    let refreshing = false, updatePending = false;
     swc.addEventListener('controllerchange', () => {
-      if (refreshing) return; refreshing = true; location.reload();
+      // `updatePending` reste faux au tout 1er chargement (clients.claim) → pas de reload parasite.
+      if (!updatePending || refreshing) return;
+      refreshing = true;
+      // Ne pas couper l'utilisateur (censure / enregistrement en cours) : on recharge la nouvelle
+      // version uniquement quand l'app est en ARRIÈRE-PLAN ; sinon on attend qu'elle le devienne.
+      if (document.visibilityState === 'hidden') { location.reload(); return; }
+      const onHide = () => {
+        if (document.visibilityState === 'hidden') { document.removeEventListener('visibilitychange', onHide); location.reload(); }
+      };
+      document.addEventListener('visibilitychange', onHide);
     });
     reg.addEventListener('updatefound', () => {
       const sw = reg.installing;
       if (!sw) return;
       sw.addEventListener('statechange', () => {
         if (sw.state === 'installed' && navigator.serviceWorker.controller) {
-          sw.postMessage('SKIP_WAITING'); // active immédiatement la nouvelle version
+          updatePending = true;           // c'est une VRAIE mise à jour (un SW contrôlait déjà la page)
+          sw.postMessage('SKIP_WAITING'); // active la nouvelle version
         }
       });
     });

@@ -20,7 +20,31 @@ export async function renderReader({ bookId, gotoPage = null, highlightQuery = n
   if (!isIndexed(book)) indexBook(book).catch((e) => console.warn('[index]', e));
 
   const tracker = createReadingTracker({ book, onProgress: updateProgressUI });
-  const pane = createReaderPane({ book, pdfDoc, dual: false, onActivePage: (i) => { tracker.setActivePage(i); updatePageLabel(i); } });
+  const autoPrompted = new Set(); let autoTimer = 0;
+  const pane = createReaderPane({
+    book, pdfDoc, dual: false,
+    onActivePage: (i) => { tracker.setActivePage(i); updatePageLabel(i); },
+    onMarksChange: (i, marks) => { clearTimeout(autoTimer); autoTimer = setTimeout(() => autoVerify(i, marks), 700); },
+  });
+
+  // Propose AUTOMATIQUEMENT de censurer toute la page dès qu'on dépasse le seuil (sans cliquer "Vérifier").
+  async function autoVerify(i, marks) {
+    if (pane.isPageCensored(i)) return;
+    const size = pane.getNativeSize(i);
+    if (!size || !marks || !marks.length) return;
+    const cov = computeCoverage(marks, size.w, size.h);
+    if (cov >= 0.995) { pane.setPageCensored(i, true); toast(`Page ${i + 1} entièrement censurée.`); return; }
+    const threshold = await getSetting('coverageThreshold');
+    if (cov > threshold && !autoPrompted.has(i)) {
+      autoPrompted.add(i);
+      const ok = await confirmDialog({
+        title: `Page ${i + 1} censurée à ${Math.round(cov * 100)} %`,
+        message: `Tu as masqué plus de ${Math.round(threshold * 100)} % de cette page.\nVeux-tu la censurer entièrement ? (réversible)`,
+        okText: 'Oui, censurer la page', cancelText: 'Non',
+      });
+      if (ok) { pane.setPageCensored(i, true); toast(`Page ${i + 1} marquée comme censurée.`); }
+    }
+  }
 
   // ---- Aller à une page (saut direct, sans scroller longtemps) ----
   function updatePageLabel(i) { if (gotoBtn) gotoBtn.textContent = `p.${(i || 0) + 1}`; }
@@ -98,7 +122,7 @@ export async function renderReader({ bookId, gotoPage = null, highlightQuery = n
   toolbar.rightSlot.prepend(progressEl);
   toolbar.rightSlot.append(exportBtn);
 
-  function updateProgressUI({ fraction, bookRead }) {
+  function updateProgressUI({ fraction, bookRead, pagesSatisfied, totalPages }) {
     const p = Math.round(fraction * 100);
     fill.style.width = p + '%';
     pctLabel.textContent = p + ' % lu';
@@ -109,7 +133,12 @@ export async function renderReader({ bookId, gotoPage = null, highlightQuery = n
     } else {
       exportBtn.disabled = true;
       exportBtn.classList.remove('btn--primary');
-      exportBtn.title = 'Termine la lecture du livre pour débloquer l’export';
+      // Indique combien de pages il reste à lire (anti-triche : 98 % des pages requises).
+      const need = Math.max(1, Math.ceil((totalPages || 0) * 0.98));
+      const remaining = Math.max(0, need - (pagesSatisfied || 0));
+      exportBtn.title = remaining
+        ? `Encore ~${remaining} page${remaining > 1 ? 's' : ''} à lire pour débloquer l’export`
+        : 'Continue ta lecture pour débloquer l’export';
     }
   }
 

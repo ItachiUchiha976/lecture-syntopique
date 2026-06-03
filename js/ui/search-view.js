@@ -1,9 +1,11 @@
 // Overlay de recherche plein texte (barre + portée + résultats + navigation).
 import { el, debounce } from '../utils.js';
 import { searchText } from '../search.js';
+import { getBook, getAllBooks } from '../storage.js';
 
 // onGoto({ bookId, pageIndex, normQuery, occ }) : déclenché à la sélection d'un résultat.
 export function createSearchView({ currentBookId, onGoto }) {
+  let curBookId = currentBookId;   // livre courant (peut changer : panneau focalisé en lecture double)
   let scope = 'book';
   let results = [];
   let sel = -1;
@@ -25,6 +27,7 @@ export function createSearchView({ currentBookId, onGoto }) {
     onClick: () => setScope('all') });
 
   const countLine = el('div', { class: 'search-count', text: '' });
+  const ocrNote = el('div', { class: 'search-ocr-note', text: '', style: { display: 'none' } });
   const list = el('div', { class: 'search-results' });
   const prevBtn = el('button', { class: 'btn btn-icon', html: '↑', title: 'Résultat précédent', onClick: () => step(-1) });
   const nextBtn = el('button', { class: 'btn btn-icon', html: '↓', title: 'Résultat suivant', onClick: () => step(1) });
@@ -38,6 +41,7 @@ export function createSearchView({ currentBookId, onGoto }) {
       el('span', { class: 'search-scope' }, [scopeBook, scopeAll]),
       countLine,
     ]),
+    ocrNote,
     list,
   ]);
   const element = el('div', { class: 'search-overlay hidden' }, [panel]);
@@ -53,11 +57,20 @@ export function createSearchView({ currentBookId, onGoto }) {
 
   const runSearch = debounce(async () => {
     const q = input.value;
-    const res = await searchText(q, { scope, bookId: currentBookId });
+    const res = await searchText(q, { scope, bookId: curBookId });
     normQuery = res.query;
     results = res.results;
     sel = -1;
     renderResults(res);
+    // Indicateur OCR : si l'indexation/OCR tourne encore, prévenir que des résultats peuvent manquer.
+    try {
+      const books = scope === 'all'
+        ? await getAllBooks()
+        : (curBookId ? [await getBook(curBookId)].filter(Boolean) : []);
+      const busy = books.some((b) => b && (b.ocrStatus === 'pending' || b.ocrStatus === 'running'));
+      ocrNote.style.display = busy ? '' : 'none';
+      ocrNote.textContent = busy ? '🔄 Indexation/OCR en cours — certains résultats peuvent encore manquer (réessaie dans un instant).' : '';
+    } catch {}
   }, 220);
 
   function renderResults(res) {
@@ -103,5 +116,5 @@ export function createSearchView({ currentBookId, onGoto }) {
   function close() { element.classList.add('hidden'); }
   function isOpen() { return !element.classList.contains('hidden'); }
 
-  return { element, open, close, isOpen, destroy() {} };
+  return { element, open, close, isOpen, setCurrentBook(id) { curBookId = id; }, destroy() {} };
 }

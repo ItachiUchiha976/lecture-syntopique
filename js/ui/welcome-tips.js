@@ -112,12 +112,24 @@ function showUsageGuide() {
   ]);
   const card = el('div', { class: 'dialog usage-card', role: 'dialog', 'aria-modal': 'true' }, [
     el('h3', { text: '📖 Aide-mémoire' }),
-    item('🖊️', 'Censurer', 'Choisis un outil — ▭ rectangle, ◌ forme libre, ou 🖊 <strong>surligneur (marqueur : trait épais)</strong> — puis dessine à l’<strong>Apple Pencil</strong>. Le doigt sert à faire défiler.'),
-    item('▦', 'Ouvrir 2 PDF côte à côte', 'Dans la bibliothèque, bouton <strong>Comparer</strong> sur un livre → choisis le second. Le bouton <strong>⇄</strong> remplace un des deux.'),
-    item('✔️', 'Censurer toute une page', 'Bouton <strong>Vérifier la censure</strong> : si plus de <strong>80 %</strong> est masqué, l’app propose de censurer toute la page (100 % = automatique).'),
-    item('♻️', 'Effacer / rétablir une censure', 'Prends la gomme <strong>⌫</strong> puis <strong>tape une censure du doigt</strong> pour retirer celle-là précisément (sans toucher aux autres). <strong>↶</strong> annule le dernier tracé. Page entière : bouton <strong>Rétablir</strong>. Réversible même après réouverture du PDF.'),
-    item('🔢', 'Aller à une page', 'Touche l’indicateur <strong>p.X</strong> en haut à droite pour sauter directement à un numéro de page — en lecture <strong>simple ET double</strong> (pratique pour les longs PDF).'),
-    item('📍', 'Reprise de lecture', 'À la réouverture d’un livre, tu retrouves <strong>automatiquement la dernière page lue</strong> (en double, chaque panneau reprend sa page).'),
+    el('div', { class: 'usage-scroll' }, [
+      item('🧰', 'Les outils de la barre', '<ul class="usage-tools">' +
+        '<li><strong>✋ Lecture</strong> : faire défiler et sélectionner le texte (aucun dessin).</li>' +
+        '<li><strong>▭ Rectangle</strong> et <strong>◌ Forme libre</strong> : censure <strong>noire</strong> (cache le texte).</li>' +
+        '<li><strong>🖊️ Surligneur</strong> : trait <strong>bleu translucide</strong> (emphase, garde le texte lisible).</li>' +
+        '<li><strong>⌫ Gomme</strong> : effacer une censure (tape-la du doigt). <strong>↶ Annuler</strong> : le dernier tracé.</li>' +
+        '<li><strong>− / 100 % / +</strong> : zoom. <strong>Vérifier la censure</strong> : marquer la page (seuil 80 %).</li>' +
+        '<li><strong>🎤</strong> notes vocales · <strong>🔍</strong> recherche · <strong>p.X</strong> aller à une page.</li>' +
+        '<li><strong>⇄</strong> changer le livre (en double) · <strong>Exporter</strong> le PDF filtré.</li>' +
+        '</ul>'),
+      item('🖊️', 'Censurer ou surligner', '<strong>Censurer</strong> (cacher en noir) : ▭ rectangle ou ◌ forme libre. <strong>Surligner</strong> (mettre en avant <em>sans</em> cacher) : 🖊 surligneur <strong>bleu translucide</strong>. Dessine à l’<strong>Apple Pencil</strong> ; le doigt fait défiler.'),
+      item('▦', 'Lecture double', 'Bouton <strong>Comparer</strong> → choisis le 2ᵉ PDF. Le bouton <strong>⇄</strong> remplace un des deux. La <strong>recherche 🔍 et l’export</strong> y sont aussi disponibles (sur le panneau actif).'),
+      item('✔️', 'Censurer toute une page', 'Si tu masques plus de <strong>80 %</strong>, l’app <strong>propose automatiquement</strong> de censurer toute la page (100 % = automatique). Bouton <strong>Vérifier</strong> sinon.'),
+      item('♻️', 'Effacer / rétablir', 'Gomme <strong>⌫</strong> + <strong>tape une censure du doigt</strong> pour retirer celle-là précisément. <strong>↶</strong> annule le dernier tracé. Page entière : <strong>Rétablir</strong>. Réversible même après réouverture du PDF.'),
+      item('🎤', 'Connexions vocales', 'Bouton <strong>🎤</strong> → <strong>● Enregistrer</strong>, parle, <strong>■ Stop</strong>. Puis ▶︎ écouter, ⤴ partager (Drive / IA), 🗑 supprimer.'),
+      item('🔢', 'Aller à une page', 'Touche l’indicateur <strong>p.X</strong> (en haut) pour sauter directement à un numéro de page — en simple <strong>et</strong> double.'),
+      item('📍', 'Reprise de lecture', 'À la réouverture d’un livre, tu retrouves <strong>automatiquement la dernière page lue</strong> (chaque panneau en double).'),
+    ]),
     el('div', { class: 'welcome-foot' }, [
       el('span', { class: 'spacer' }),
       el('button', { class: 'btn btn--primary', text: 'Compris', onClick: () => close() }),

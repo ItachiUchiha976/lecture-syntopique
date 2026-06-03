@@ -135,12 +135,18 @@ export function createVoiceNotes({ getContext }) {
   }
 
   async function playInline(row, n) {
-    if (row.querySelector('audio')) return; // déjà ouvert
-    const blob = await store.loadBinaryBlob(n.audioRef);
-    if (!blob) { toast('Audio introuvable.'); return; }
-    const url = URL.createObjectURL(blob); objectUrls.push(url);
-    const audio = el('audio', { controls: '', src: url, autoplay: '', style: { width: '100%', marginTop: '8px' } });
-    row.appendChild(audio);
+    let audio = row.querySelector('audio');
+    if (!audio) {
+      // On relit les OCTETS et on recrée un Blob AVEC le bon type MIME : un Blob OPFS
+      // sans type n'est pas lisible par <audio> sur iOS (d'où les notes « injouables »).
+      const u8 = await store.loadBinary(n.audioRef);
+      if (!u8) { toast('Audio introuvable.'); return; }
+      const blob = new Blob([u8], { type: n.mime || 'audio/mp4' });
+      const url = URL.createObjectURL(blob); objectUrls.push(url);
+      audio = el('audio', { controls: '', src: url, preload: 'metadata', style: { width: '100%', marginTop: '8px' } });
+      row.appendChild(audio);
+    }
+    try { await audio.play(); } catch { /* l'utilisateur peut utiliser les contrôles natifs */ }
   }
 
   function fileName(n) { return `connexion-${safeName(n.title)}-${formatDate(n.createdAt)}.${n.ext || 'm4a'}`; }

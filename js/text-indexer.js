@@ -28,6 +28,7 @@ async function indexWithDoc(book, pdfDoc) {
   let withText = 0, needOcr = 0;
   await store.updateBook(book.id, { ocrStatus: 'pending' });
   for (let i = 1; i <= book.pageCount; i++) {
+    if (store.cancelledBooks.has(book.id)) return book; // livre supprimé pendant l'indexation → stop (pas de pages fantômes)
     const page = await pdfDoc.getPage(i);
     const vp = page.getViewport({ scale: 1 });
     pageSizes[i - 1] = { w: vp.width, h: vp.height };

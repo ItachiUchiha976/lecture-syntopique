@@ -6,9 +6,11 @@ const TOOLS = [
   { id: 'none', glyph: '✋', title: 'Lecture / déplacement (scroll, sélection texte)' },
   { id: 'rect', glyph: '▭', title: 'Censure : rectangle' },
   { id: 'lasso', glyph: '◌', title: 'Censure : forme libre (lasso)' },
-  { id: 'highlight', glyph: '🖊️', title: 'Censure : surligneur (marqueur au stylet)' },
+  { id: 'highlight', glyph: '🖊️', title: 'Surligneur bleu (emphase — garde le texte visible, ≠ censure)' },
   { id: 'erase', glyph: '⌫', title: 'Gomme : effacer une censure' },
 ];
+
+let hintShown = false; // conseil "stylet" affiché une seule fois par session
 
 export function createToolbar({ pane, onVerify }) {
   const buttons = {};
@@ -18,7 +20,13 @@ export function createToolbar({ pane, onVerify }) {
     const b = el('button', {
       class: 'tool', title: t.title, html: t.glyph,
       'aria-pressed': String(t.id === 'none'),
-      onClick: () => { pane.setTool(t.id); setActive(t.id); },
+      onClick: () => {
+        pane.setTool(t.id); setActive(t.id);
+        if (!hintShown && t.id !== 'none') {
+          hintShown = true;
+          toast('✏️ Dessine avec l’Apple Pencil — le doigt fait défiler. (Gomme : tape une censure du doigt pour l’effacer.)', { duration: 4500 });
+        }
+      },
     });
     buttons[t.id] = b;
     return b;
