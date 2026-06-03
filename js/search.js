@@ -22,13 +22,15 @@ function makeSnippet(text, q) {
 
 // Retourne une liste de résultats par page :
 // { bookId, bookTitle, pageIndex, count, snippet }
-export async function searchText(query, { scope = 'book', bookId = null } = {}) {
+// scope : 'book' (livre sélectionné = bookId) | 'open' (les livres ouverts = openBookIds) | 'all' (tous les importés).
+export async function searchText(query, { scope = 'book', bookId = null, openBookIds = null } = {}) {
   const q = normalizeQuery(query);
   if (!q) return { query: q, results: [], totalOccurrences: 0 };
 
-  const books = scope === 'book'
-    ? [await store.getBook(bookId)].filter(Boolean)
-    : await store.getAllBooks();
+  let books;
+  if (scope === 'book') books = [await store.getBook(bookId)].filter(Boolean);
+  else if (scope === 'open') books = (await Promise.all((openBookIds || []).map((id) => store.getBook(id)))).filter(Boolean);
+  else books = await store.getAllBooks();
 
   const results = [];
   let totalOccurrences = 0;

@@ -34,9 +34,11 @@ function modal(build) {
     // Clic sur le fond = annulation (résout undefined)
     overlay.addEventListener('pointerdown', (e) => { if (e.target === overlay) close(undefined); });
     document.body.appendChild(overlay);
-    // focus auto
-    const focusable = content.querySelector('button, input, [tabindex]');
-    if (focusable) setTimeout(() => focusable.focus(), 30);
+    // Focus auto. Pour un CHAMP DE SAISIE, focus SYNCHRONE (dans le geste utilisateur) afin que le clavier
+    // iOS s'affiche : un focus différé (setTimeout) ne lève PAS le clavier sur iPad/Safari.
+    const field = content.querySelector('input, textarea, select');
+    if (field) { try { field.focus({ preventScroll: true }); } catch { try { field.focus(); } catch {} } }
+    else { const f = content.querySelector('button, [tabindex]'); if (f) setTimeout(() => f.focus(), 30); }
   });
 }
 
@@ -67,6 +69,8 @@ export function promptDialog({ title, message, placeholder = '', value = '', okT
   return modal((close) => {
     const input = el('input', {
       type, placeholder, value,
+      // Clavier numérique pour les saisies de nombre (ex. « aller à la page ») sur iPad.
+      inputmode: type === 'number' ? 'numeric' : null,
       style: { width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid var(--line)',
                background: 'var(--bg)', color: 'var(--text)', marginTop: '8px', minHeight: '44px' },
       onKeydown: (e) => { if (e.key === 'Enter') close(input.value); if (e.key === 'Escape') close(null); },

@@ -66,8 +66,10 @@ Deux options gratuites, de la plus simple à la plus classique :
   Bouton **⤓ Tout exporter** pour partager toutes les notes d'un livre d'un coup. *(Le micro doit être autorisé
   dans Safari à la 1ʳᵉ utilisation. iOS enregistre en .m4a, lu partout — pas de mp3 natif.)*
 - **Rechercher** (🔍, en lecture simple **et** double) : insensible à la **casse et aux accents** (« batons » trouve
-  « Bâtons »…) et aux **ligatures** (« find » trouve « ﬁnd »). Filtre **Ce livre** / **Tous les livres** ; le mot
-  trouvé est **surligné temporairement** dans la page. Si l'OCR d'un PDF scanné n'est pas fini, un message le signale.
+  « Bâtons »…) et aux **ligatures** (« find » trouve « ﬁnd »). **Trois portées** : **Ce livre** (le PDF sélectionné),
+  **Les 2 livres** (les deux PDF ouverts côte à côte — uniquement en lecture double), **Tous les livres** (tous les PDF
+  importés, ouverts ou non). Le mot trouvé est **surligné temporairement** dans la page. Si l'OCR d'un PDF scanné
+  n'est pas fini, un message le signale.
 - **OCR** : automatique à l'import pour les **PDF scannés** (anglais + français), pour rendre le texte cherchable.
 - **Exporter** : se débloque **quand tu as réellement lu tout le livre** (le temps de présence sur chaque page
   est mesuré ; scroller jusqu'à la fin ne suffit pas). Le PDF exporté est une **expurgation gravée** :

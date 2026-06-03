@@ -4,9 +4,11 @@ import { searchText } from '../search.js';
 import { getBook, getAllBooks } from '../storage.js';
 
 // onGoto({ bookId, pageIndex, normQuery, occ }) : déclenché à la sélection d'un résultat.
-export function createSearchView({ currentBookId, onGoto }) {
+export function createSearchView({ currentBookId, onGoto, openBookIds = null }) {
   let curBookId = currentBookId;   // livre courant (peut changer : panneau focalisé en lecture double)
-  let scope = 'book';
+  const openIds = Array.isArray(openBookIds) ? openBookIds.filter(Boolean) : [];
+  const isDual = openIds.length >= 2;   // le filtre « les 2 livres ouverts » n'a de sens qu'en lecture double
+  let scope = 'book';                   // 'book' (sélectionné) | 'open' (2 ouverts) | 'all' (tous les importés)
   let results = [];
   let sel = -1;
   let normQuery = '';
@@ -22,9 +24,11 @@ export function createSearchView({ currentBookId, onGoto }) {
   });
 
   const scopeBook = el('button', { class: 'btn chip', text: 'Ce livre', 'aria-pressed': 'true',
-    onClick: () => setScope('book') });
+    title: 'Chercher uniquement dans le PDF sélectionné', onClick: () => setScope('book') });
+  const scopeOpen = isDual ? el('button', { class: 'btn chip', text: 'Les 2 livres', 'aria-pressed': 'false',
+    title: 'Chercher dans les 2 PDF ouverts côte à côte', onClick: () => setScope('open') }) : null;
   const scopeAll = el('button', { class: 'btn chip', text: 'Tous les livres', 'aria-pressed': 'false',
-    onClick: () => setScope('all') });
+    title: 'Chercher dans tous les PDF importés (ouverts ou non)', onClick: () => setScope('all') });
 
   const countLine = el('div', { class: 'search-count', text: '' });
   const ocrNote = el('div', { class: 'search-ocr-note', text: '', style: { display: 'none' } });
@@ -38,7 +42,7 @@ export function createSearchView({ currentBookId, onGoto }) {
       input, prevBtn, nextBtn, closeBtn,
     ]),
     el('div', { class: 'search-row search-row--meta' }, [
-      el('span', { class: 'search-scope' }, [scopeBook, scopeAll]),
+      el('span', { class: 'search-scope' }, [scopeBook, scopeOpen, scopeAll]),
       countLine,
     ]),
     ocrNote,
@@ -51,22 +55,24 @@ export function createSearchView({ currentBookId, onGoto }) {
   function setScope(s) {
     scope = s;
     scopeBook.setAttribute('aria-pressed', String(s === 'book'));
+    if (scopeOpen) scopeOpen.setAttribute('aria-pressed', String(s === 'open'));
     scopeAll.setAttribute('aria-pressed', String(s === 'all'));
     runSearch();
   }
 
   const runSearch = debounce(async () => {
     const q = input.value;
-    const res = await searchText(q, { scope, bookId: curBookId });
+    const res = await searchText(q, { scope, bookId: curBookId, openBookIds: openIds });
     normQuery = res.query;
     results = res.results;
     sel = -1;
     renderResults(res);
     // Indicateur OCR : si l'indexation/OCR tourne encore, prévenir que des résultats peuvent manquer.
     try {
-      const books = scope === 'all'
-        ? await getAllBooks()
-        : (curBookId ? [await getBook(curBookId)].filter(Boolean) : []);
+      let books;
+      if (scope === 'all') books = await getAllBooks();
+      else if (scope === 'open') books = (await Promise.all(openIds.map((id) => getBook(id)))).filter(Boolean);
+      else books = curBookId ? [await getBook(curBookId)].filter(Boolean) : [];
       const busy = books.some((b) => b && (b.ocrStatus === 'pending' || b.ocrStatus === 'running'));
       ocrNote.style.display = busy ? '' : 'none';
       ocrNote.textContent = busy ? '🔄 Indexation/OCR en cours — certains résultats peuvent encore manquer (réessaie dans un instant).' : '';
@@ -82,7 +88,7 @@ export function createSearchView({ currentBookId, onGoto }) {
     results.forEach((r, idx) => {
       const item = el('button', { class: 'search-item', onClick: () => select(idx) }, [
         el('div', { class: 'search-item__head' }, [
-          scope === 'all' ? el('span', { class: 'search-item__book', text: r.bookTitle }) : null,
+          scope !== 'book' ? el('span', { class: 'search-item__book', text: r.bookTitle }) : null,
           el('span', { class: 'search-item__page', text: `Page ${r.pageIndex + 1}` }),
           r.count > 1 ? el('span', { class: 'badge', text: `${r.count}×` }) : null,
         ]),
@@ -111,7 +117,10 @@ export function createSearchView({ currentBookId, onGoto }) {
 
   function open() {
     element.classList.remove('hidden');
-    setTimeout(() => input.focus(), 40);
+    // Focus SYNCHRONE (dans le geste utilisateur) + reflow après le passage display:none→visible,
+    // pour que le clavier iOS s'affiche (un focus différé ne le lève pas sur iPad/Safari).
+    void element.offsetWidth;
+    try { input.focus({ preventScroll: true }); } catch { try { input.focus(); } catch {} }
   }
   function close() { element.classList.add('hidden'); }
   function isOpen() { return !element.classList.contains('hidden'); }

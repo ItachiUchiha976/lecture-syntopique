@@ -151,6 +151,7 @@ export async function renderDual({ leftBookId, rightBookId }) {
   // ---- Recherche (dans le livre focalisé ; le résultat va au bon panneau) ----
   const search = createSearchView({
     currentBookId: left.book.id,
+    openBookIds: [left.book.id, right.book.id], // active le filtre « Les 2 livres » en lecture double
     onGoto: ({ bookId: bid, pageIndex, normQuery, occ }) => {
       if (bid === left.book.id) { search.close(); setFocus('L'); paneL.highlightQuery(pageIndex, normQuery, occ); }
       else if (bid === right.book.id) { search.close(); setFocus('R'); paneR.highlightQuery(pageIndex, normQuery, occ); }

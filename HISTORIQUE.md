@@ -348,3 +348,23 @@ sur la **1ʳᵉ page** en mode simple (pages suivantes OK) ; (2) **tout le trac�
 - L'hypothèse « pinch-zoom / visual viewport » est **écartée**. Le fix `computeBaseW` (padding réel) + gouttière 28 px
   du §16 restent utiles (anti-débordement / anti-gestes) mais étaient **secondaires** : la vraie cause était le buffer↔affichage.
 - `version.js` → **2026.06.03.10**.
+
+---
+
+## 18. Clavier iOS + 3 portées de recherche (2026-06-03, nuit) — v2026.06.03.11
+
+Constaté sur iPad : (1) le **clavier numérique** n'apparaît pas pour « aller à la page » ; (2) le **clavier** n'apparaît
+pas pour la **recherche**. Plus une demande : **3 filtres** de recherche au lieu de 2.
+
+- **Clavier iOS (cause + fix).** Sur iPad/Safari, le clavier ne se lève QUE si `input.focus()` est appelé
+  **synchroniquement dans le geste utilisateur**. `dialogs.js` (`modal`) et `search-view.js` (`open`) focalisaient via
+  `setTimeout(...)` → clavier jamais levé. **Fix** : focus **synchrone** (+ `void offsetWidth` après `display:none→visible`
+  pour la recherche). `promptDialog` ajoute `inputmode:'numeric'` quand `type='number'` → pavé numérique pour la page.
+- **Recherche — 3 portées.** Ajout du filtre **« Les 2 livres »** (les 2 PDF ouverts) entre **« Ce livre »** (PDF
+  sélectionné) et **« Tous les livres »** (tous les importés). `search.js#searchText` gère `scope:'open'` via `openBookIds` ;
+  `createSearchView({openBookIds})` n'affiche la 3ᵉ puce **qu'en lecture double** (`dual-view.js` passe les 2 ids). En mode
+  simple : 2 puces (Ce livre / Tous), comme avant.
+- **Validation** : `node --check` ; test d'intégration Chrome headless/CDP — portées `book`/`open`/`all` renvoient
+  exactement les bons livres (le mot propre au 3ᵉ livre n'est PAS trouvé en portée « 2 livres »), et le nombre de puces
+  est 3 en double / 2 en simple. **PASS**. (Le clavier iOS lui-même se valide sur l'appareil.)
+- Docs (README, aide-mémoire `welcome-tips.js`) mis à jour. `version.js` → **2026.06.03.11**.
