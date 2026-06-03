@@ -1,7 +1,27 @@
 // Overlay de recherche plein texte (barre + portée + résultats + navigation).
-import { el, debounce } from '../utils.js';
+import { el, debounce, escapeHtml } from '../utils.js';
 import { searchText } from '../search.js';
+import { buildNormIndex, findMatches } from '../text-normalize.js';
 import { getBook, getAllBooks } from '../storage.js';
+
+// Surligne en JAUNE les occurrences de la requête (normalisée, insensible casse/accents) dans un extrait.
+// Renvoie du HTML échappé (les parties hors correspondance sont sécurisées par escapeHtml).
+function snippetHtml(snippet, normQuery) {
+  if (!snippet) return '';
+  if (!normQuery) return escapeHtml(snippet);
+  const { norm, map } = buildNormIndex(snippet);
+  const intervals = findMatches(norm, map, normQuery, snippet.length);
+  if (!intervals.length) return escapeHtml(snippet);
+  let html = '', pos = 0;
+  for (const iv of intervals) {
+    const s = Math.max(pos, iv.start), e = Math.max(s, iv.end);
+    if (s > pos) html += escapeHtml(snippet.slice(pos, s));
+    html += '<mark class="search-hl">' + escapeHtml(snippet.slice(s, e)) + '</mark>';
+    pos = e;
+  }
+  if (pos < snippet.length) html += escapeHtml(snippet.slice(pos));
+  return html;
+}
 
 // onGoto({ bookId, pageIndex, normQuery, occ }) : déclenché à la sélection d'un résultat.
 export function createSearchView({ currentBookId, onGoto, openBookIds = null }) {
@@ -92,7 +112,7 @@ export function createSearchView({ currentBookId, onGoto, openBookIds = null }) 
           el('span', { class: 'search-item__page', text: `Page ${r.pageIndex + 1}` }),
           r.count > 1 ? el('span', { class: 'badge', text: `${r.count}×` }) : null,
         ]),
-        el('div', { class: 'search-item__snippet', text: r.snippet }),
+        el('div', { class: 'search-item__snippet', html: snippetHtml(r.snippet, normQuery) }),
       ]);
       list.appendChild(item);
     });

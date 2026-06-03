@@ -266,6 +266,12 @@ export function createCensorLayer({ wrap, cssW, cssH, nativeW, nativeH, getTool,
     }
     if (!drawing || e.pointerId !== penId) return;
     drawing = false; penId = null;
+    // IMPORTANT (iPad/Safari) : libérer la capture du STYLET au lever, comme le fait la branche
+    // doigt/pan (ligne ~261). Sans cela, Safari garde le canvas en « interaction en cours », ce qui
+    // empêche par la suite un focus() synchrone (recherche / « aller à la page ») de LEVER le clavier
+    // logiciel — d'où le clavier intermittent corrélé à l'usage du stylet. Relancer l'app remettait
+    // l'état à zéro ; un défilement au doigt (qui, lui, relâche la capture) le « réparait » aussi.
+    try { canvas.releasePointerCapture(e.pointerId); } catch {}
     if (onDrawingChange) onDrawingChange(false);
     const tool = getTool();
     const p = localPt(e);
@@ -286,8 +292,14 @@ export function createCensorLayer({ wrap, cssW, cssH, nativeW, nativeH, getTool,
   }
 
   function onCancel(e) {
-    if (!e || e.pointerId === panId) { panning = false; panId = null; cancelMomentum(); }
+    if (!e || e.pointerId === panId) {
+      if (e) { try { canvas.releasePointerCapture(e.pointerId); } catch {} }
+      panning = false; panId = null; cancelMomentum();
+    }
     if (!e || e.pointerId === penId) {
+      // Voir onUp : on relâche aussi la capture du stylet ici (annulation : paume/multi-touch),
+      // sans quoi l'état de capture reste « collé » et bloque la levée du clavier ensuite.
+      if (e) { try { canvas.releasePointerCapture(e.pointerId); } catch {} }
       drawing = false; penId = null;
       if (onDrawingChange) onDrawingChange(false);
       previewRect = null; points = [];

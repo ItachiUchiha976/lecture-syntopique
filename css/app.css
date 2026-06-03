@@ -149,6 +149,13 @@ body {
 
 /* ===== Recherche ===== */
 .search-overlay { position: fixed; inset: 0; z-index: 90; background: rgba(2,6,23,.35); display: flex; flex-direction: column; }
+/* L'overlay de recherche reste DANS la mise en page quand il est « caché » : on le masque par
+   opacity/pointer-events au lieu de display:none (qui retire l'élément du layout). Sur iPad/Safari,
+   focus() est plus fiable pour LEVER le clavier sur un champ déjà en layout que sur un champ qui
+   vient de passer de display:none à visible. On NE touche PAS à la règle globale .hidden (utilisée
+   par les <input type=file> de la bibliothèque et le panneau de notes vocales) : on la surcharge
+   uniquement, et avec plus de spécificité, pour .search-overlay. */
+.search-overlay.hidden { display: flex !important; opacity: 0; pointer-events: none; }
 .search-panel {
   background: var(--bg-elev); border-bottom: 1px solid var(--line); box-shadow: var(--shadow);
   padding: 10px max(12px, var(--safe-left)) 12px max(12px, var(--safe-right));
@@ -171,6 +178,8 @@ body {
 .search-item__book { color: var(--accent-2); font-weight: 600; }
 .search-item__page { font-weight: 600; color: var(--text); }
 .search-item__snippet { font-size: .9rem; color: var(--text); line-height: 1.35; }
+/* Terme recherché surligné en JAUNE dans l'extrait (résultats plus visibles). */
+.search-item__snippet .search-hl { background: #fde047; color: #1a1206; border-radius: 3px; padding: 0 2px; font-weight: 600; }
 
 /* ===== Sélecteur "Comparer" ===== */
 .compare-list { display: flex; flex-direction: column; gap: 8px; max-height: 50vh; overflow: auto; margin-top: 10px; }

@@ -368,3 +368,30 @@ pas pour la **recherche**. Plus une demande : **3 filtres** de recherche au lieu
   exactement les bons livres (le mot propre au 3ᵉ livre n'est PAS trouvé en portée « 2 livres »), et le nombre de puces
   est 3 en double / 2 en simple. **PASS**. (Le clavier iOS lui-même se valide sur l'appareil.)
 - Docs (README, aide-mémoire `welcome-tips.js`) mis à jour. `version.js` → **2026.06.03.11**.
+  (Aide-mémoire complété ensuite : fiches « Progression de lecture » et « Exporter » — `version.js` → **2026.06.03.12**.)
+
+---
+
+## 19. Clavier iOS intermittent (fuite de pointer capture) + surlignage jaune des résultats (2026-06-03, nuit) — v2026.06.03.13
+
+Test iPad : le clavier (p.X numérique, recherche) **s'ouvrait puis devenait intermittent « dès l'usage du stylet »**
+(« parfois oui parfois non », « relancer l'app suffit »). + demande : surligner les résultats de recherche en jaune.
+
+- **Cause racine (diagnostic multi-agents, confiance ~0,8) : FUITE DE POINTER CAPTURE.** `censor.js` faisait
+  `canvas.setPointerCapture()` au `pointerdown` du STYLET mais **ne la relâchait jamais** au `pointerup`/`pointercancel`
+  (seule la branche doigt/pan relâchait — asymétrie). Une capture « collée » garde le canvas en « interaction en cours »
+  et **empoisonne l'activation transitoire** d'iOS → le `focus()` synchrone suivant (recherche / p.X) réussit côté DOM
+  mais **iOS supprime le clavier**. Explique l'intermittence (selon que la capture a été relâchée par hasard via un pan
+  au doigt ou un pointercancel), la corrélation au stylet, et « relancer l'app remet à zéro ».
+- **Fix `censor.js`** : `releasePointerCapture` au lever ET à l'annulation du stylet (try/catch, après commit du tracé),
+  symétrique à la branche doigt. **Validé** : test de coordonnées Chrome headless → le tracé commit toujours sous la
+  pointe + un 2ᵉ tracé passe (pas d'état bloqué). Aucune régression dessin/scroll/palm-rejection.
+- **Fix complémentaire `app.css`** : l'overlay de recherche est masqué par **opacity:0 + pointer-events:none** (et non
+  `display:none`) — l'input reste en layout, donc `focus()` lève le clavier plus fiablement. `.search-overlay.hidden`
+  surcharge la règle globale `.hidden` (laissée intacte pour les `<input type=file>` et les notes vocales).
+- **Surlignage JAUNE des résultats** : dans la liste de résultats, le terme recherché est surligné
+  (`<mark class="search-hl">`, fond jaune `#fde047`) **dans chaque extrait**, via `buildNormIndex`+`findMatches`
+  (insensible casse/accents) ; parties hors-correspondance **échappées** (`escapeHtml`, pas d'injection HTML).
+  **Validé** en Node (2 correspondances « Bâton/bâton » pour la requête « baton », `<ici>` bien échappé).
+- `version.js` → **2026.06.03.13**. README + aide-mémoire déjà à jour pour la recherche. Reste à confirmer le clavier
+  sur l'iPad réel (le comportement clavier iOS n'est pas reproductible en navigateur de bureau).
