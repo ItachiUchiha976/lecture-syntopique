@@ -12,8 +12,9 @@
 .toolbar .spacer { flex: 1; }
 
 /* Indicateur de progression de lecture (Phase 6) */
-.read-progress { display: flex; align-items: center; gap: 8px; font-size: .8rem; color: var(--text-dim); }
-.read-progress .bar { width: 120px; }
+.read-progress { display: flex; align-items: center; gap: 8px; font-size: .8rem; color: var(--text-dim);
+  white-space: nowrap; font-variant-numeric: tabular-nums; }
+.read-progress .bar { width: 90px; flex: 0 0 auto; }
 
 /* Zoom (− / 100% / +) */
 .toolbar .zoom-group { display: flex; align-items: center; gap: 2px; }

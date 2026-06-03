@@ -12,7 +12,7 @@ const TOOLS = [
 
 let hintShown = false; // conseil "stylet" affiché une seule fois par session
 
-export function createToolbar({ pane, onVerify }) {
+export function createToolbar({ pane }) {
   const buttons = {};
   function setActive(id) { for (const k in buttons) buttons[k].setAttribute('aria-pressed', String(k === id)); }
 
@@ -48,10 +48,8 @@ export function createToolbar({ pane, onVerify }) {
     onClick: () => { if (pane.zoomBy) pane.zoomBy(1.25); updateZoomLabel(); } });
   const zoomGroup = el('span', { class: 'zoom-group' }, [zoomOut, zoomLabel, zoomIn]);
 
-  const verifyBtn = el('button', { class: 'btn', text: 'Vérifier la censure',
-    onClick: () => onVerify && onVerify() });
-
-  const right = el('span', { class: 'toolbar__right' }, [verifyBtn]);
+  // rightSlot : rempli par les vues (progression, bouton « Censurer la page », notes vocales, export).
+  const right = el('span', { class: 'toolbar__right' }, []);
   const element = el('div', { class: 'toolbar' }, [
     ...toolEls,
     el('span', { class: 'sep' }),

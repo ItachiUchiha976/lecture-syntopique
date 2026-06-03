@@ -43,6 +43,26 @@ async function terminateWorker() {
 
 const inProgress = new Set();
 const listeners = new Set();
+
+// Reconnaît un canvas et renvoie les MOTS avec leur boîte (bbox px, repère haut-gauche).
+// Utilisé par l'export pour reconstruire une couche de texte cherchable sur les pages
+// scannées raturées (les zones masquées sont noires → aucun mot reconnu dessus → pas de fuite).
+// NB : `blocks:true` est requis (le défaut de Tesseract.js est `blocks:false`, donc pas de positions).
+export async function ocrCanvasWords(canvas, langs = 'eng+fra') {
+  const worker = await getWorker(langs);
+  const res = await worker.recognize(canvas, {}, { blocks: true });
+  const out = [];
+  const blocks = (res && res.data && res.data.blocks) || [];
+  for (const b of blocks)
+    for (const p of (b.paragraphs || []))
+      for (const l of (p.lines || []))
+        for (const w of (l.words || []))
+          if (w && w.text && w.text.trim() && w.bbox) out.push({ text: w.text, bbox: w.bbox });
+  return out;
+}
+
+// Libère le worker OCR si plus aucun OCR de fond n'est en cours (à appeler après un export).
+export async function releaseOcrWorker() { if (inProgress.size === 0) await terminateWorker(); }
 export function onOcrProgress(fn) { listeners.add(fn); return () => listeners.delete(fn); }
 function emit(e) { for (const fn of listeners) { try { fn(e); } catch {} } }
 

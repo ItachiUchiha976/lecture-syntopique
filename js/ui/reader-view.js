@@ -1,15 +1,14 @@
 // Vue lecteur (un seul PDF) : en-tête + barre d'outils + recherche + lecteur,
 // avec suivi de lecture (anti-triche) et déblocage de l'export.
-import { el } from '../utils.js';
+import { el, formatReadingProgress } from '../utils.js';
 import { navigate } from '../router.js';
 import { openBookDoc } from '../book-doc.js';
 import { destroyDoc } from '../pdf-engine.js';
 import { createReaderPane } from './reader-pane.js';
 import { createSearchView } from './search-view.js';
 import { createToolbar } from './toolbar.js';
-import { toast, confirmDialog, promptDialog } from './dialogs.js';
-import { computeCoverage } from '../coverage.js';
-import { getSetting, getProgress } from '../storage.js';
+import { toast, promptDialog } from './dialogs.js';
+import { getProgress } from '../storage.js';
 import { indexBook, isIndexed } from '../text-indexer.js';
 import { createReadingTracker } from '../reading-tracker.js';
 import { runExportFlow } from './export-flow.js';
@@ -20,31 +19,11 @@ export async function renderReader({ bookId, gotoPage = null, highlightQuery = n
   if (!isIndexed(book)) indexBook(book).catch((e) => console.warn('[index]', e));
 
   const tracker = createReadingTracker({ book, onProgress: updateProgressUI });
-  const autoPrompted = new Set(); let autoTimer = 0;
   const pane = createReaderPane({
     book, pdfDoc, dual: false,
-    onActivePage: (i) => { tracker.setActivePage(i); updatePageLabel(i); },
-    onMarksChange: (i, marks) => { clearTimeout(autoTimer); autoTimer = setTimeout(() => autoVerify(i, marks), 700); },
+    onActivePage: (i) => { tracker.setActivePage(i); updatePageLabel(i); refreshCensorBtn(); },
+    onCensoredChange: (i) => { if (i === pane.getActivePageIndex()) refreshCensorBtn(); },
   });
-
-  // Propose AUTOMATIQUEMENT de censurer toute la page dès qu'on dépasse le seuil (sans cliquer "Vérifier").
-  async function autoVerify(i, marks) {
-    if (pane.isPageCensored(i)) return;
-    const size = pane.getNativeSize(i);
-    if (!size || !marks || !marks.length) return;
-    const cov = computeCoverage(marks, size.w, size.h);
-    if (cov >= 0.995) { pane.setPageCensored(i, true); toast(`Page ${i + 1} entièrement censurée.`); return; }
-    const threshold = await getSetting('coverageThreshold');
-    if (cov > threshold && !autoPrompted.has(i)) {
-      autoPrompted.add(i);
-      const ok = await confirmDialog({
-        title: `Page ${i + 1} censurée à ${Math.round(cov * 100)} %`,
-        message: `Tu as masqué plus de ${Math.round(threshold * 100)} % de cette page.\nVeux-tu la censurer entièrement ? (réversible)`,
-        okText: 'Oui, censurer la page', cancelText: 'Non',
-      });
-      if (ok) { pane.setPageCensored(i, true); toast(`Page ${i + 1} marquée comme censurée.`); }
-    }
-  }
 
   // ---- Aller à une page (saut direct, sans scroller longtemps) ----
   function updatePageLabel(i) { if (gotoBtn) gotoBtn.textContent = `p.${(i || 0) + 1}`; }
@@ -57,38 +36,22 @@ export async function renderReader({ bookId, gotoPage = null, highlightQuery = n
   }
   const gotoBtn = el('button', { class: 'btn goto-page', text: 'p.1', title: 'Aller à une page…', onClick: () => gotoPage() });
 
-  // ---- Vérifier la censure (page active) ----
-  async function onVerify() {
+  // ---- Censurer / Rétablir la page en cours de lecture (page active) ----
+  // Remplace l'ancienne détection auto à 80 % (peu fiable) par une action explicite et réversible.
+  const censorBtn = el('button', { class: 'btn', onClick: () => {
     const i = pane.getActivePageIndex();
     if (i < 0) { toast('Page non détectée.'); return; }
-    const size = pane.getNativeSize(i);
-    const marks = pane.getCensorMarks(i) || [];
-    if (!size) { toast('Page pas encore prête, réessaie.'); return; }
-    if (pane.isPageCensored(i)) {
-      const undo = await confirmDialog({ title: `Page ${i + 1} déjà censurée`,
-        message: 'Cette page est marquée comme entièrement censurée. Veux-tu la rétablir ?',
-        okText: 'Rétablir', cancelText: 'Garder censurée' });
-      if (undo) pane.setPageCensored(i, false);
-      return;
-    }
-    if (!marks.length) { toast('Aucune censure sur cette page pour l’instant.'); return; }
-    const cov = computeCoverage(marks, size.w, size.h);
-    const pct = Math.round(cov * 100);
-    const threshold = await getSetting('coverageThreshold');
-    const thr = Math.round(threshold * 100);
-    if (cov >= 0.995) {
-      pane.setPageCensored(i, true);
-      toast(`Page ${i + 1} entièrement censurée → marquée comme censurée.`);
-    } else if (cov > threshold) {
-      const ok = await confirmDialog({
-        title: `Page ${i + 1} censurée à ${pct} %`,
-        message: `Tu as masqué plus de ${thr} % de cette page.\nVeux-tu la censurer entièrement ? (réversible à tout moment)`,
-        okText: 'Oui, censurer la page', cancelText: 'Non',
-      });
-      if (ok) { pane.setPageCensored(i, true); toast(`Page ${i + 1} marquée comme censurée.`); }
-    } else {
-      toast(`Page ${i + 1} censurée à ${pct} % (seuil de ${thr} % non atteint).`);
-    }
+    pane.setPageCensored(i, !pane.isPageCensored(i));
+    refreshCensorBtn();
+  } });
+  function refreshCensorBtn() {
+    const i = pane.getActivePageIndex();
+    const on = i >= 0 && pane.isPageCensored(i);
+    censorBtn.textContent = on ? 'Rétablir la page' : 'Censurer la page';
+    censorBtn.title = on
+      ? 'Afficher de nouveau cette page (annule la censure)'
+      : 'Masquer entièrement cette page — supprimée du PDF exporté (réversible à tout moment)';
+    censorBtn.classList.toggle('btn--primary', on);
   }
 
   async function onExport() {
@@ -99,7 +62,9 @@ export async function renderReader({ bookId, gotoPage = null, highlightQuery = n
     await runExportFlow({ book });
   }
 
-  const toolbar = createToolbar({ pane, onVerify });
+  const toolbar = createToolbar({ pane });
+  toolbar.rightSlot.append(censorBtn);
+  refreshCensorBtn();
 
   // ---- Notes vocales de connexion (audio rattaché à la page active) ----
   const voice = createVoiceNotes({
@@ -122,10 +87,12 @@ export async function renderReader({ bookId, gotoPage = null, highlightQuery = n
   toolbar.rightSlot.prepend(progressEl);
   toolbar.rightSlot.append(exportBtn);
 
-  function updateProgressUI({ fraction, bookRead, pagesSatisfied, totalPages }) {
+  function updateProgressUI({ fraction, bookRead, pagesSatisfied, totalPages, remainingMs = 0, pagesRemaining = 0 }) {
     const p = Math.round(fraction * 100);
     fill.style.width = p + '%';
-    pctLabel.textContent = p + ' % lu';
+    const info = formatReadingProgress({ fraction, bookRead, remainingMs, pagesRemaining });
+    pctLabel.textContent = info.label;
+    progressEl.title = info.title;
     if (bookRead) {
       exportBtn.disabled = false;
       exportBtn.classList.add('btn--primary');

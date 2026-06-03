@@ -42,6 +42,25 @@ export function createReadingTracker({ book, onProgress = null }) {
     bookRead = pagesSatisfied >= need;
   }
 
+  // Progression FRACTIONNAIRE (barre fluide) + estimations restantes.
+  // fraction = moyenne, sur toutes les pages, du ratio temps_présent/temps_requis (plafonné à 1).
+  // remainingMs = temps restant estimé pour finir les pages non encore satisfaites.
+  function computeProgress() {
+    let acc = 0, remainingMs = 0;
+    for (let i = 0; i < totalPages; i++) {
+      const pp = perPage[i];
+      if (!pp) { remainingMs += requiredFor(i); continue; }
+      const r = pp.requiredMs > 0 ? Math.min(1, pp.accumulatedMs / pp.requiredMs) : 1;
+      acc += r;
+      if (!pp.satisfied) remainingMs += Math.max(0, pp.requiredMs - pp.accumulatedMs);
+    }
+    return {
+      fraction: totalPages ? acc / totalPages : 0,
+      remainingMs,
+      pagesRemaining: Math.max(0, totalPages - pagesSatisfied),
+    };
+  }
+
   function flush() {
     const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
     if (active < 0 || !visible) { activeSince = now; return; }
@@ -63,7 +82,7 @@ export function createReadingTracker({ book, onProgress = null }) {
   const persistThrottled = throttle(persist, 2000);
 
   function emit() {
-    if (onProgress) onProgress({ pagesSatisfied, totalPages, bookRead, fraction: totalPages ? pagesSatisfied / totalPages : 0 });
+    if (onProgress) onProgress({ pagesSatisfied, totalPages, bookRead, ...computeProgress() });
   }
 
   function onVis() {
@@ -102,7 +121,7 @@ export function createReadingTracker({ book, onProgress = null }) {
       activeSince = (typeof performance !== 'undefined') ? performance.now() : Date.now();
     },
     get bookRead() { return bookRead; },
-    snapshot() { return { pagesSatisfied, totalPages, bookRead, fraction: totalPages ? pagesSatisfied / totalPages : 0 }; },
+    snapshot() { return { pagesSatisfied, totalPages, bookRead, ...computeProgress() }; },
     destroy() {
       flush(); persist(); stop();
       document.removeEventListener('visibilitychange', onVis);

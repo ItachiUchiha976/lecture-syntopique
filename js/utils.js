@@ -81,3 +81,20 @@ export function escapeHtml(s) {
 }
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Met en forme la progression de lecture en FR pour l'indicateur (mode simple ET double).
+// Ex : « 62 % lu · ~18 min · 23 p. restantes » ; quand le livre est lu : « Lecture terminée · prêt à exporter ».
+export function formatReadingProgress({ fraction = 0, bookRead = false, remainingMs = 0, pagesRemaining = 0 } = {}) {
+  const pct = Math.round(clamp(fraction, 0, 1) * 100);
+  if (bookRead) return { label: pct + ' % lu', title: 'Lecture terminée · prêt à exporter' };
+  const parts = [pct + ' % lu'];
+  const min = Math.round(remainingMs / 60000);
+  if (remainingMs > 0) {
+    if (min < 1) parts.push('~1 min');
+    else if (min < 60) parts.push('~' + min + ' min');
+    else parts.push('~' + Math.floor(min / 60) + ' h ' + (min % 60) + ' min');
+  }
+  if (pagesRemaining > 0) parts.push(pagesRemaining + ' p. restante' + (pagesRemaining > 1 ? 's' : ''));
+  const label = parts.join(' · ');
+  return { label, title: 'Progression de lecture réelle — ' + label };
+}

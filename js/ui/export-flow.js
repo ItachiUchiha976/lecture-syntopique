@@ -6,28 +6,6 @@ import * as store from '../storage.js';
 
 function sanitize(name) { return String(name || 'livre').replace(/[\\/:*?"<>|]+/g, ' ').trim() || 'livre'; }
 
-// Modale de choix : gravure (irréversible) vs léger (intact).
-function chooseBurn() {
-  return new Promise((resolve) => {
-    const overlay = el('div', { class: 'overlay' });
-    const close = (v) => { overlay.remove(); resolve(v); };
-    const burnBtn = el('button', { class: 'btn btn--primary', text: 'Graver les censures (recommandé)',
-      onClick: () => close('burn') });
-    const lightBtn = el('button', { class: 'btn', text: 'Garder les pages intactes',
-      onClick: () => close('light') });
-    const cancel = el('button', { class: 'btn btn--ghost', text: 'Annuler', onClick: () => close(null) });
-    overlay.appendChild(el('div', { class: 'dialog', role: 'dialog' }, [
-      el('h3', { text: 'Que faire des censures sur les pages conservées ?' }),
-      el('p', { html:
-        '<b>Graver (irréversible)</b> : les zones masquées sont définitivement noircies (la page devient une image, le texte caché disparaît vraiment).<br><br>' +
-        '<b>Garder intactes</b> : on superpose de simples rectangles noirs ; le texte sous le masque resterait techniquement récupérable.' }),
-      el('div', { class: 'dialog__actions', style: { flexWrap: 'wrap' } }, [cancel, lightBtn, burnBtn]),
-    ]));
-    overlay.addEventListener('pointerdown', (e) => { if (e.target === overlay) close(null); });
-    document.body.appendChild(overlay);
-  });
-}
-
 function progressDialog(title) {
   const bar = el('span');
   const label = el('p', { text: 'Préparation…' });
@@ -81,18 +59,17 @@ export async function runExportFlow({ book }) {
     title: 'Avant d’exporter — réfléchis bien',
     message: `As-tu bien identifié les informations précieuses à garder, et celles à supprimer ?\n\n` +
       `• ${censored} page(s) censurée(s) seront DÉFINITIVEMENT supprimées du PDF exporté.\n` +
-      `• ${kept} page(s) seront conservées.\n\n` +
+      `• ${kept} page(s) seront conservées.\n` +
+      `• Les zones masquées (rectangle / forme libre) sont GRAVÉES : le texte dessous disparaît vraiment.\n` +
+      `• Le reste du texte reste CHERCHABLE (pour un livre scanné, l’OCR est ré-appliqué : cela peut prendre quelques minutes).\n\n` +
       `Ton livre d’origine reste intact dans l’app : seul un nouveau PDF est créé.`,
-    okText: 'Continuer', cancelText: 'Annuler',
+    okText: 'Exporter', cancelText: 'Annuler',
   });
   if (!ok) return;
 
-  const choice = await chooseBurn();
-  if (!choice) return;
-
   const prog = progressDialog('Génération du PDF filtré…');
   try {
-    const bytes = await exportFilteredPdf(book, { burnPartial: choice === 'burn', onProgress: (d, t) => prog.set(d, t) });
+    const bytes = await exportFilteredPdf(book, { onProgress: (d, t) => prog.set(d, t) });
     prog.close();
     await saveOrShare(bytes, `${sanitize(book.title)} (filtré).pdf`);
     toast('PDF filtré généré.');

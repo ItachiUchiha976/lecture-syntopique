@@ -33,8 +33,19 @@ export function createReaderPane({ book, pdfDoc, dual = false, onActivePage = nu
   const censoredPages = new Set(); // pages marquées "entièrement censurées"
 
   function computeBaseW() {
+    // clientWidth inclut le padding (box-sizing:border-box). On retire le padding RÉEL
+    // (résolu par getComputedStyle : env()/max() déjà convertis en px) au lieu d'un -24 codé en
+    // dur, sinon la page DÉBORDE de sa colonne et son bord droit tombe sous la zone de gestes
+    // système d'iPad (bord physique) → non censurable en lecture double (bug bord droit).
     const w = scroller.clientWidth || element.clientWidth || 800;
-    return clamp(Math.floor(w - 24), 200, 2400);
+    let pad = 24;
+    try {
+      const cs = getComputedStyle(scroller);
+      const pl = parseFloat(cs.paddingLeft) || 0;
+      const pr = parseFloat(cs.paddingRight) || 0;
+      if (pl + pr > 0) pad = pl + pr;
+    } catch {}
+    return clamp(Math.floor(w - pad), 200, 2400);
   }
   // Largeur d'affichage effective = largeur ajustée au conteneur × zoom utilisateur.
   function recomputeWidths() {
@@ -190,8 +201,8 @@ export function createReaderPane({ book, pdfDoc, dual = false, onActivePage = nu
       if (isWanted(i)) { if (!rendered.has(i) && !queue.includes(i)) enqueue(i); }
       else if (rendered.has(i) || queue.includes(i)) recycle(i);
     }
-    // Suivi de la page "active" (la plus proche du centre) — utile pour "Vérifier"
-    // (Phase 5) et le suivi de lecture (Phase 6).
+    // Suivi de la page "active" (la plus proche du centre) — utilisée par le bouton
+    // « Censurer la page » et le suivi de lecture (progression).
     let best = -1, bd = Infinity;
     const b = viewBounds();
     for (let i = 0; i < numPages; i++) {

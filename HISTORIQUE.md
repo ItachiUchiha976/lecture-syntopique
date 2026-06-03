@@ -296,3 +296,34 @@ perte de données ET tout rechargement-surprise en pleine lecture. `version.js` 
   `version.js` → **2026.06.02.3**. App **publiée en ligne** sur GitHub Pages (cf. [[deploiement-en-ligne]] côté mémoire).
   Syntaxe ES vérifiée (`node --check`) + service HTTP local OK. Reste à valider sur iPad réel : micro `.m4a`,
   partage (Drive/Claude), et l'affichage de la citation de sortie.
+
+---
+
+## 16. Lot de corrections (2026-06-03, nuit) — censure explicite, export cherchable, mise en page double
+
+Demandes de l'utilisateur après usage réel sur iPad. `version.js` → **2026.06.03.9**.
+
+- **Bug — bord droit non censurable en lecture double.** Cause confirmée (diagnostic multi-agents) :
+  `computeBaseW` (reader-pane.js) soustrayait un **`-24` codé en dur** au lieu du **padding réel**. En paysage, le
+  panneau droit a 40 px de padding (16+24) ; on n'en retirait que 24 → la page **débordait de 16 px** et son bord
+  droit tombait à ~8 px du bord physique, **dans la zone de gestes système iPad** (~20 px) qui avale le 1ᵉʳ contact du
+  Pencil. **Fix** : lecture du padding via `getComputedStyle` ; gouttière anti-gestes portée à **28 px** (`reader.css`).
+- **Bug — décalage du tracé en double.** La chaîne de coordonnées (`localPt = clientX − getBoundingClientRect().left`)
+  est **mathématiquement correcte** (immune au scroll/padding/flex) — vérifié de façon adverse. Le fix du débordement
+  ci-dessus supprime le scroll horizontal parasite (contributeur le plus plausible). Si un décalage subsiste, cause
+  probable = **pinch-zoom du visual viewport iPad** (`user-scalable=no` ignoré par Safari iOS), à confirmer sur l'appareil.
+- **Censure repensée.** Suppression de la **détection auto à 80 %** (peu fiable) et du bouton **« Vérifier »**.
+  Remplacés par un bouton explicite **« Censurer la page / Rétablir la page »** sur la page active. En **double**,
+  **un bouton par panneau** (« Censurer G / D ») → ne censure jamais les deux livres d'un coup. Réversible.
+- **Export refondu — un seul mode = REDACTION GRAVÉE, mais texte cherchable conservé.** Le mode « léger » est retiré.
+  Pages censurées **supprimées** ; ratures (rectangle/forme libre) **gravées** (texte dessous vraiment détruit) ; le reste
+  du **texte reste cherchable** via une couche invisible (`opacity:0`) : **texte natif** (numérique, items sous masque
+  exclus), **ré-OCR** de l'image raturée (scanné raturé), texte OCR **stocké** injecté (scanné non raturé). Seules les
+  pages raturées sont rasterisées ; les autres **copiées intactes** (copie groupée, pas de gonflage).
+- **Barre de progression affinée.** Désormais **fractionnaire** (plus de palier par page) + libellé
+  **« X % lu · ~Y min · Z p. restantes »** ; ajoutée aussi en **lecture double** (suit le panneau actif).
+- **Aide-mémoire** (`welcome-tips.js`) mis à jour (plus de « Vérifier » ni de « 80 % »).
+- **Validation.** `node --check` sur tous les fichiers ; **tests d'intégration en Chrome headless via CDP** sur
+  `sample.pdf` (numérique) + `scanned.pdf` (scanné) : suppression de page, rasterisation+masque, **texte réinjecté
+  extractible** (natif + OCR injecté + **ré-OCR** = 17 mots positionnés), tous **PASS**. Reste à confirmer sur iPad réel
+  le décalage du tracé (bug visual-viewport éventuel) et le confort du bord droit.

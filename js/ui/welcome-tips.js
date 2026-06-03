@@ -118,13 +118,13 @@ function showUsageGuide() {
         '<li><strong>▭ Rectangle</strong> et <strong>◌ Forme libre</strong> : censure <strong>noire</strong> (cache le texte).</li>' +
         '<li><strong>🖊️ Surligneur</strong> : trait <strong>bleu translucide</strong> (emphase, garde le texte lisible).</li>' +
         '<li><strong>⌫ Gomme</strong> : effacer une censure (tape-la du doigt). <strong>↶ Annuler</strong> : le dernier tracé.</li>' +
-        '<li><strong>− / 100 % / +</strong> : zoom. <strong>Vérifier la censure</strong> : marquer la page (seuil 80 %).</li>' +
+        '<li><strong>− / 100 % / +</strong> : zoom. <strong>Censurer la page</strong> : masquer toute la page lue (réversible ; en double : un bouton par livre, G/D).</li>' +
         '<li><strong>🎤</strong> notes vocales · <strong>🔍</strong> recherche · <strong>p.X</strong> aller à une page.</li>' +
         '<li><strong>⇄</strong> changer le livre (en double) · <strong>Exporter</strong> le PDF filtré.</li>' +
         '</ul>'),
       item('🖊️', 'Censurer ou surligner', '<strong>Censurer</strong> (cacher en noir) : ▭ rectangle ou ◌ forme libre. <strong>Surligner</strong> (mettre en avant <em>sans</em> cacher) : 🖊 surligneur <strong>bleu translucide</strong>. Dessine à l’<strong>Apple Pencil</strong> ; le doigt fait défiler.'),
       item('▦', 'Lecture double', 'Bouton <strong>Comparer</strong> → choisis le 2ᵉ PDF. Le bouton <strong>⇄</strong> remplace un des deux. La <strong>recherche 🔍 et l’export</strong> y sont aussi disponibles (sur le panneau actif).'),
-      item('✔️', 'Censurer toute une page', 'Si tu masques plus de <strong>80 %</strong>, l’app <strong>propose automatiquement</strong> de censurer toute la page (100 % = automatique). Bouton <strong>Vérifier</strong> sinon.'),
+      item('✔️', 'Censurer toute une page', 'Bouton <strong>Censurer la page</strong> : masque entièrement la page en cours de lecture (elle sera <strong>supprimée du PDF exporté</strong>). En lecture double, <strong>un bouton par livre</strong> (Censurer G / Censurer D) pour ne pas censurer les deux d’un coup. <strong>Réversible</strong> à tout moment (le bouton devient « Rétablir »).'),
       item('♻️', 'Effacer / rétablir', 'Gomme <strong>⌫</strong> + <strong>tape une censure du doigt</strong> pour retirer celle-là précisément. <strong>↶</strong> annule le dernier tracé. Page entière : <strong>Rétablir</strong>. Réversible même après réouverture du PDF.'),
       item('🎤', 'Connexions vocales', 'Bouton <strong>🎤</strong> → <strong>● Enregistrer</strong>, parle, <strong>■ Stop</strong>. Puis ▶︎ écouter, ⤴ partager (Drive / IA), 🗑 supprimer.'),
       item('🔢', 'Aller à une page', 'Touche l’indicateur <strong>p.X</strong> (en haut) pour sauter directement à un numéro de page — en simple <strong>et</strong> double.'),

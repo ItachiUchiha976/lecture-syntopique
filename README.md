@@ -44,7 +44,9 @@ Deux options gratuites, de la plus simple à la plus classique :
 
 - **Importer** : bouton « Importer un PDF » → choisis un ou plusieurs PDF (Fichiers, iCloud, Drive…).
   Ils sont copiés **dans l'app** (stockage privé local). Rien à ranger dans un dossier.
-- **Lire** : touche « Ouvrir ». Le **% lu** s'affiche en haut. L'app **rouvre automatiquement à la dernière page lue**.
+- **Lire** : touche « Ouvrir ». En haut s'affiche la **progression réelle** sous la forme
+  **« X % lu · ~temps restant · pages restantes »** (barre fluide, en lecture simple **et** double).
+  L'app **rouvre automatiquement à la dernière page lue**.
   Touche l'indicateur **p.X** (en haut à droite) pour **aller directement à une page** (en simple **et** en double).
 - **Comparer (lecture double)** : « Comparer » sur un livre → choisis le second → les deux s'affichent côte à côte.
   Le bouton **⇄** en haut de chaque colonne permet de **remplacer** un des deux PDF par un autre sans quitter la
@@ -54,8 +56,9 @@ Deux options gratuites, de la plus simple à la plus classique :
   - **Censurer (cacher)** : **▭ Rectangle** ou **◌ Forme libre (lasso)** — masque **noir**.
   - **Surligner (mettre en avant sans cacher)** : **🖊️ Surligneur** — trait **bleu translucide**, le texte reste lisible.
   - **⌫ Gomme** et **↶ Annuler**. **Effacer une censure précise** : prends la **⌫ gomme** et **tape la censure du doigt** (seule celle-là est retirée).
-  - **« Vérifier la censure »** : si la page est couverte à **> 80 %**, l'app propose de la **censurer entièrement** ;
-    à 100 %, elle est marquée automatiquement. Tu peux **Rétablir** une page censurée à tout moment.
+  - **« Censurer la page »** : masque **toute la page** en cours de lecture (elle sera **supprimée du PDF exporté**).
+    En **lecture double**, il y a **un bouton par livre** (« Censurer G » / « Censurer D ») pour ne **pas** censurer les
+    deux d'un coup. C'est **réversible** à tout moment : le bouton devient alors **« Rétablir la page »**.
 - **Connexions vocales** (🎤) : enregistre à voix haute les liens que tu découvres entre les documents.
   Appuie sur **● Enregistrer**, parle, puis **■ Stop** : la note (audio **.m4a**) est rangée dans l'app, rattachée
   à la page (en lecture double, elle retient les **deux** livres/pages comparés). Pour chaque note : **▶︎ écouter**,
@@ -67,9 +70,13 @@ Deux options gratuites, de la plus simple à la plus classique :
   trouvé est **surligné temporairement** dans la page. Si l'OCR d'un PDF scanné n'est pas fini, un message le signale.
 - **OCR** : automatique à l'import pour les **PDF scannés** (anglais + français), pour rendre le texte cherchable.
 - **Exporter** : se débloque **quand tu as réellement lu tout le livre** (le temps de présence sur chaque page
-  est mesuré ; scroller jusqu'à la fin ne suffit pas). À l'export : avertissement, puis **choix** de
-  *graver* les censures (irréversible) ou de *garder les pages intactes*. Les pages censurées sont
-  **définitivement supprimées** du PDF exporté ; ton livre d'origine reste intact dans l'app.
+  est mesuré ; scroller jusqu'à la fin ne suffit pas). Le PDF exporté est une **expurgation gravée** :
+  - les **pages censurées** (bouton « Censurer la page ») sont **définitivement supprimées** ;
+  - les **zones raturées** (▭ rectangle / ◌ forme libre) sont **gravées** : le texte masqué **disparaît vraiment** ;
+  - **tout le reste du texte demeure cherchable** (sélection, copie, lecture par une IA). Pour un PDF **scanné**,
+    l'**OCR est ré-appliqué** à l'export pour conserver cette recherche — cela peut prendre quelques minutes.
+
+  Ton livre d'origine reste **intact** dans l'app (seul un nouveau PDF est créé).
 - **Sauvegarder / Restaurer** : exporte tout ton projet dans un fichier, et restaure-le (filet de sécurité,
   ou pour migrer vers une autre URL/un autre appareil).
 

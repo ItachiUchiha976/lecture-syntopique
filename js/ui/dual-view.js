@@ -1,15 +1,14 @@
 // Vue lecteur DOUBLE : deux PDF côte à côte (lecture syntopique).
 // Une barre d'outils partagée agit sur le panneau "focalisé" (dernier touché).
 // La censure et le suivi de lecture fonctionnent indépendamment pour chaque livre.
-import { el } from '../utils.js';
+import { el, formatReadingProgress } from '../utils.js';
 import { navigate } from '../router.js';
 import { openBookDoc } from '../book-doc.js';
 import { destroyDoc } from '../pdf-engine.js';
 import { createReaderPane } from './reader-pane.js';
 import { createToolbar } from './toolbar.js';
-import { toast, confirmDialog, promptDialog } from './dialogs.js';
-import { computeCoverage } from '../coverage.js';
-import { getSetting, getAllBooks, getProgress } from '../storage.js';
+import { toast, promptDialog } from './dialogs.js';
+import { getAllBooks, getProgress } from '../storage.js';
 import { indexBook, isIndexed } from '../text-indexer.js';
 import { createReadingTracker } from '../reading-tracker.js';
 import { createVoiceNotes } from './voice-notes.js';
@@ -21,33 +20,15 @@ export async function renderDual({ leftBookId, rightBookId }) {
   const right = await openBookDoc(rightBookId);
   for (const b of [left.book, right.book]) if (!isIndexed(b)) indexBook(b).catch(() => {});
 
-  const trackerL = createReadingTracker({ book: left.book, onProgress: () => { if (focused === 'L') updateExportBtn(); } });
-  const trackerR = createReadingTracker({ book: right.book, onProgress: () => { if (focused === 'R') updateExportBtn(); } });
+  const trackerL = createReadingTracker({ book: left.book, onProgress: () => { if (focused === 'L') { updateExportBtn(); updateDualProgress(); } } });
+  const trackerR = createReadingTracker({ book: right.book, onProgress: () => { if (focused === 'R') { updateExportBtn(); updateDualProgress(); } } });
 
-  const autoPromptedL = new Set(), autoPromptedR = new Set();
-  let tL = 0, tR = 0;
   const paneL = createReaderPane({ book: left.book, pdfDoc: left.pdfDoc, dual: true,
-    onActivePage: (i) => { trackerL.setActivePage(i); if (focused === 'L') updateDualPageLabel(); },
-    onMarksChange: (i, marks) => { clearTimeout(tL); tL = setTimeout(() => autoVerify(paneL, left.book, autoPromptedL, i, marks), 700); } });
+    onActivePage: (i) => { trackerL.setActivePage(i); if (focused === 'L') updateDualPageLabel(); refreshCensorBtnL(); },
+    onCensoredChange: (i) => { if (i === paneL.getActivePageIndex()) refreshCensorBtnL(); } });
   const paneR = createReaderPane({ book: right.book, pdfDoc: right.pdfDoc, dual: true,
-    onActivePage: (i) => { trackerR.setActivePage(i); if (focused === 'R') updateDualPageLabel(); },
-    onMarksChange: (i, marks) => { clearTimeout(tR); tR = setTimeout(() => autoVerify(paneR, right.book, autoPromptedR, i, marks), 700); } });
-
-  // Proposition automatique de censurer toute la page au-delà du seuil (par panneau).
-  async function autoVerify(pane, book, set, i, marks) {
-    if (pane.isPageCensored(i)) return;
-    const size = pane.getNativeSize(i);
-    if (!size || !marks || !marks.length) return;
-    const cov = computeCoverage(marks, size.w, size.h);
-    if (cov >= 0.995) { pane.setPageCensored(i, true); toast(`Page ${i + 1} entièrement censurée.`); return; }
-    const threshold = await getSetting('coverageThreshold');
-    if (cov > threshold && !set.has(i)) {
-      set.add(i);
-      const ok = await confirmDialog({ title: `Page ${i + 1} censurée à ${Math.round(cov * 100)} %`,
-        message: `Plus de ${Math.round(threshold * 100)} % masqué. Censurer toute la page ? (réversible)`, okText: 'Oui', cancelText: 'Non' });
-      if (ok) pane.setPageCensored(i, true);
-    }
-  }
+    onActivePage: (i) => { trackerR.setActivePage(i); if (focused === 'R') updateDualPageLabel(); refreshCensorBtnR(); },
+    onCensoredChange: (i) => { if (i === paneR.getActivePageIndex()) refreshCensorBtnR(); } });
 
   // ---- Aller à une page (panneau focalisé) ----
   function updateDualPageLabel() {
@@ -81,12 +62,14 @@ export async function renderDual({ leftBookId, rightBookId }) {
     updateDualPageLabel();
     if (search) search.setCurrentBook(activeBook().id); // la recherche « ce livre » suit le panneau actif
     updateExportBtn();
+    updateDualProgress(); // l'indicateur de % suit le panneau focalisé
   }
   paneL.element.addEventListener('pointerdown', () => setFocus('L'), true);
   paneR.element.addEventListener('pointerdown', () => setFocus('R'), true);
 
   // Outil appliqué aux DEUX panneaux (on peut dessiner dans l'un ou l'autre) ;
-  // undo/vérifier agissent sur le panneau focalisé.
+  // annuler (undo) et zoom agissent sur le panneau focalisé. La censure de page a
+  // son propre bouton PAR panneau (voir censorBtnL/R).
   const toolProxy = {
     setTool: (t) => { paneL.setTool(t); paneR.setTool(t); },
     undoActivePage: () => activePane().undoActivePage(),
@@ -97,31 +80,33 @@ export async function renderDual({ leftBookId, rightBookId }) {
     resetZoom: () => activePane().resetZoom(),
   };
 
-  async function onVerify() {
-    const pane = activePane();
+  const toolbar = createToolbar({ pane: toolProxy });
+
+  // ---- Censurer / Rétablir la page active, INDÉPENDAMMENT par panneau (un bouton par livre) ----
+  // Chaque bouton agit sur SON panneau : censurer le livre de gauche ne touche pas celui de droite.
+  function toggleCensor(pane, refresh) {
     const i = pane.getActivePageIndex();
     if (i < 0) { toast('Page non détectée.'); return; }
-    const size = pane.getNativeSize(i);
-    const marks = pane.getCensorMarks(i) || [];
-    if (!size) { toast('Page pas encore prête.'); return; }
-    if (pane.isPageCensored(i)) {
-      const undo = await confirmDialog({ title: `Page ${i + 1} déjà censurée`, message: 'La rétablir ?', okText: 'Rétablir', cancelText: 'Garder' });
-      if (undo) pane.setPageCensored(i, false);
-      return;
-    }
-    if (!marks.length) { toast('Aucune censure sur cette page.'); return; }
-    const cov = computeCoverage(marks, size.w, size.h);
-    const pct = Math.round(cov * 100);
-    const threshold = await getSetting('coverageThreshold');
-    if (cov >= 0.995) { pane.setPageCensored(i, true); toast(`Page ${i + 1} entièrement censurée.`); }
-    else if (cov > threshold) {
-      const ok = await confirmDialog({ title: `Page ${i + 1} censurée à ${pct} %`,
-        message: `Censurer toute la page ? (réversible)`, okText: 'Oui', cancelText: 'Non' });
-      if (ok) pane.setPageCensored(i, true);
-    } else { toast(`Page ${i + 1} censurée à ${pct} % (seuil non atteint).`); }
+    pane.setPageCensored(i, !pane.isPageCensored(i));
+    refresh();
   }
-
-  const toolbar = createToolbar({ pane: toolProxy, onVerify });
+  const censorBtnL = el('button', { class: 'btn dual-censor', onClick: () => toggleCensor(paneL, refreshCensorBtnL) });
+  const censorBtnR = el('button', { class: 'btn dual-censor', onClick: () => toggleCensor(paneR, refreshCensorBtnR) });
+  function refreshCensorBtnL() {
+    const i = paneL.getActivePageIndex();
+    const on = i >= 0 && paneL.isPageCensored(i);
+    censorBtnL.textContent = on ? 'Rétablir (G)' : 'Censurer (G)';
+    censorBtnL.title = on ? 'Rétablir la page active du livre de GAUCHE' : 'Masquer la page active du livre de GAUCHE — supprimée à l’export (réversible)';
+    censorBtnL.classList.toggle('btn--primary', on);
+  }
+  function refreshCensorBtnR() {
+    const i = paneR.getActivePageIndex();
+    const on = i >= 0 && paneR.isPageCensored(i);
+    censorBtnR.textContent = on ? 'Rétablir (D)' : 'Censurer (D)';
+    censorBtnR.title = on ? 'Rétablir la page active du livre de DROITE' : 'Masquer la page active du livre de DROITE — supprimée à l’export (réversible)';
+    censorBtnR.classList.toggle('btn--primary', on);
+  }
+  refreshCensorBtnL(); refreshCensorBtnR();
 
   // ---- Notes vocales : rattachées au panneau focalisé, en gardant les 2 côtés en contexte ----
   const voice = createVoiceNotes({
@@ -134,6 +119,20 @@ export async function renderDual({ leftBookId, rightBookId }) {
     },
   });
   toolbar.rightSlot.append(voice.button);
+
+  // ---- Indicateur de progression de lecture (suit le panneau focalisé) ----
+  const dFill = el('span');
+  const dBar = el('span', { class: 'progress-line bar' }, [dFill]);
+  const dPct = el('span', { class: 'pct', text: '0 %' });
+  const progressEl = el('span', { class: 'read-progress', title: 'Progression de lecture réelle' }, [dBar, dPct]);
+  function updateDualProgress() {
+    const s = activeTracker().snapshot();
+    dFill.style.width = Math.round((s.fraction || 0) * 100) + '%';
+    const info = formatReadingProgress(s);
+    dPct.textContent = info.label;
+    progressEl.title = info.title;
+  }
+  toolbar.rightSlot.append(progressEl);
 
   // ---- Export du livre focalisé (débloqué quand CE livre est réellement lu) ----
   const exportBtn = el('button', { class: 'btn', text: 'Exporter', disabled: '', onClick: () => onExportDual() });
@@ -193,8 +192,8 @@ export async function renderDual({ leftBookId, rightBookId }) {
   ]);
 
   const dual = el('div', { class: 'dual' }, [
-    el('div', { class: 'dual-col' }, [el('div', { class: 'dual-col__head' }, [titleL, swapL]), paneL.element]),
-    el('div', { class: 'dual-col' }, [el('div', { class: 'dual-col__head' }, [titleR, swapR]), paneR.element]),
+    el('div', { class: 'dual-col' }, [el('div', { class: 'dual-col__head' }, [titleL, censorBtnL, swapL]), paneL.element]),
+    el('div', { class: 'dual-col' }, [el('div', { class: 'dual-col__head' }, [titleR, censorBtnR, swapR]), paneR.element]),
   ]);
 
   const element = el('div', { class: 'view' }, [header, toolbar.element, dual, voice.panel, search.element]);
